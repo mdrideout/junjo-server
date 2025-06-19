@@ -1,3 +1,5 @@
+import NodeExceptionsGraph from './NodeExceptionsGraph'
+
 export default function DashboardPage() {
   // Render the users list
   return (
@@ -6,8 +8,9 @@ export default function DashboardPage() {
         <div className={'flex gap-x-3 font-bold'}>Dashboard</div>
       </div>
       <hr className={'my-4'} />
-      <div className={'px-2'}>
-        <p>Welcome to Junjo Server. This dashboard is on our roadmap.</p>
+      <div className={'px-2 flex-grow overflow-y-auto'}>
+        <p className="mb-4">Welcome to Junjo Server. This dashboard is on our roadmap.</p>
+        <NodeExceptionsGraph />
       </div>
     </div>
   )

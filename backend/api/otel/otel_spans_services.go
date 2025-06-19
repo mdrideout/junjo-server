@@ -18,6 +18,9 @@ var queryWorkflowSpans string
 //go:embed query_workflow_lineage.sql
 var queryWorkflowLineage string
 
+//go:embed query_node_exceptions.sql
+var queryNodeExceptions string
+
 func GetDistinctServiceNames(c echo.Context) error {
 	c.Logger().Printf("Running GetDistinctServiceNames function")
 
@@ -143,6 +146,67 @@ func GetWorkflowSpans(c echo.Context, serviceName string) ([]map[string]interfac
 	}
 
 	return results, nil
+}
+
+type NodeExceptionData struct {
+	ExceptionDay   string `json:"exception_day"`
+	ExceptionCount int    `json:"exception_count"`
+}
+
+func GetNodeExceptions(c echo.Context) error {
+	c.Logger().Printf("Running GetNodeExceptions function")
+
+	db := db_duckdb.DB
+	if db == nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "database connection is nil"})
+	}
+
+	rows, err := db.Query(queryNodeExceptions)
+	if err != nil {
+		c.Logger().Errorf("Error querying database for node exceptions: %v", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("database query failed: %v", err)})
+	}
+	defer rows.Close()
+
+	var results []NodeExceptionData
+	for rows.Next() {
+		var item NodeExceptionData
+		// DuckDB returns date as int64/time.Time, adjust scan accordingly if direct scan to string fails.
+		// For simplicity, assuming direct scan works or a string representation is fine.
+		// If date is time.Time, you might need to scan into time.Time and then format it.
+		var exceptionDayTime interface{} // Use interface{} to handle potential time.Time type
+		if err := rows.Scan(&exceptionDayTime, &item.ExceptionCount); err != nil {
+			c.Logger().Errorf("Error scanning row for node exceptions: %v", err)
+			// Decide if you want to continue or return an error.
+			// For now, log and continue, possibly skipping this row.
+			continue
+		}
+
+		// Convert exceptionDayTime to string. This depends on how DuckDB returns DATE.
+		// If it's time.Time, format it. If it's already a string, cast it.
+		// Example assuming it needs formatting from time.Time:
+		// if t, ok := exceptionDayTime.(time.Time); ok {
+		//  item.ExceptionDay = t.Format("2006-01-02")
+		// } else {
+		//  item.ExceptionDay = fmt.Sprintf("%v", exceptionDayTime) // Fallback or handle error
+		// }
+		// For now, let's assume it's a string or can be directly converted.
+		// This might need adjustment based on actual DB driver behavior.
+		item.ExceptionDay = fmt.Sprintf("%v", exceptionDayTime) // Simplified, adjust as needed
+
+		results = append(results, item)
+	}
+	if err = rows.Err(); err != nil {
+		c.Logger().Errorf("Error iterating rows for node exceptions: %v", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("error iterating rows: %v", err)})
+	}
+
+	if len(results) == 0 {
+		// Return empty array instead of null if no results, consistent with other endpoints
+		return c.JSON(http.StatusOK, []NodeExceptionData{})
+	}
+
+	return c.JSON(http.StatusOK, results)
 }
 
 func GetWorkflowLineage(c echo.Context, serviceName string) ([]map[string]interface{}, error) {
