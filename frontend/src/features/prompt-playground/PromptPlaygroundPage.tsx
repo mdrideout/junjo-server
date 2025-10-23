@@ -166,15 +166,16 @@ export default function PromptPlaygroundPage() {
     try {
       dispatch(PromptPlaygroundActions.setOutput(null))
       dispatch(PromptPlaygroundActions.setLoading(true))
-      dispatch(PromptPlaygroundActions.setError(false))
+      dispatch(PromptPlaygroundActions.setError(null))
       const result = await geminiTextRequest(payload)
       if (result.candidates && result.candidates.length > 0) {
         const text = result.candidates[0].content.parts[0].text
         dispatch(PromptPlaygroundActions.setOutput(text))
       }
       setTestEndTime(new Date().toISOString())
-    } catch {
-      dispatch(PromptPlaygroundActions.setError(true))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error generating content'
+      dispatch(PromptPlaygroundActions.setError(errorMessage))
     } finally {
       dispatch(PromptPlaygroundActions.setLoading(false))
     }
@@ -347,7 +348,7 @@ export default function PromptPlaygroundPage() {
                   'Generate'
                 )}
               </button>
-              {outputError && <div className="text-red-500 mt-2">Error generating content</div>}
+              {outputError && <div className="text-red-500 mt-2">{outputError}</div>}
             </form>
           </div>
         </div>

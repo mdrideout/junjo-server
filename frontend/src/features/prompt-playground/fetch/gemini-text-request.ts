@@ -13,7 +13,17 @@ export const geminiTextRequest = async (payload: GeminiTextRequest) => {
   })
 
   if (!response.ok) {
-    throw new Error('Failed to generate content')
+    // Try to extract error message from response body
+    let errorMessage = 'Failed to generate content'
+    try {
+      const errorData = await response.json()
+      if (errorData.error) {
+        errorMessage = errorData.error
+      }
+    } catch {
+      // If parsing fails, use default message
+    }
+    throw new Error(errorMessage)
   }
 
   const data = await response.json()

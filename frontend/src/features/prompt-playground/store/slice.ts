@@ -4,7 +4,7 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 interface PromptPlaygroundState {
   output: string | null
   loading: boolean
-  error: boolean
+  error: string | null
   selectedModel: string | null
   jsonMode: boolean
 }
@@ -12,7 +12,7 @@ interface PromptPlaygroundState {
 const initialState: PromptPlaygroundState = {
   output: null,
   loading: false,
-  error: false,
+  error: null,
   selectedModel: null,
   jsonMode: false,
 }
@@ -27,7 +27,7 @@ export const promptPlaygroundSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload
     },
-    setError: (state, action: PayloadAction<boolean>) => {
+    setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload
     },
     setSelectedModel: (state, action: PayloadAction<string | null>) => {
