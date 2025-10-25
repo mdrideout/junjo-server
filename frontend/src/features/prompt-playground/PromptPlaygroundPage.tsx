@@ -10,6 +10,11 @@ import ModelSelector from './components/ModelSelector'
 import { Switch } from '../../components/catalyst/switch'
 import { getSpanDurationString } from '../../util/duration-utils'
 import CircularProgress from '../../components/CircularProgress'
+import { detectProviderWarnings, detectGeminiJsonSchema } from './utils/provider-warnings'
+import ProviderWarningBanner from './components/ProviderWarningBanner'
+import ProviderWarningModal from './components/ProviderWarningModal'
+import JsonSchemaBanner from './components/JsonSchemaBanner'
+import JsonSchemaModal from './components/JsonSchemaModal'
 
 export default function PromptPlaygroundPage() {
   const { serviceName, traceId, spanId } = useParams<{
@@ -23,6 +28,8 @@ export default function PromptPlaygroundPage() {
   const [originalModel, setOriginalModel] = useState<string | null>(null)
   const [testStartTime, setTestStartTime] = useState<string | null>(null)
   const [testEndTime, setTestEndTime] = useState<string | null>(null)
+  const [warningModalOpen, setWarningModalOpen] = useState(false)
+  const [schemaModalOpen, setSchemaModalOpen] = useState(false)
   const dispatch = useAppDispatch()
   const {
     output,
@@ -139,6 +146,10 @@ export default function PromptPlaygroundPage() {
   const modelName = span.attributes_json['llm.model_name'] || 'Unknown'
   const provider = span.attributes_json['llm.provider'] || 'Unknown'
   const mimeType = span.attributes_json['input.mime_type'] || ''
+
+  // Compute provider warning and JSON schema info directly from span (no state needed)
+  const providerWarning = detectProviderWarnings(span)
+  const jsonSchemaInfo = detectGeminiJsonSchema(span)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -327,7 +338,13 @@ export default function PromptPlaygroundPage() {
                   />
                 </div>
               </div>
-              {jsonMode && (
+              {providerWarning && <ProviderWarningBanner onClick={() => setWarningModalOpen(true)} />}
+
+              {!providerWarning && jsonSchemaInfo && (
+                <JsonSchemaBanner onClick={() => setSchemaModalOpen(true)} />
+              )}
+
+              {jsonMode && !providerWarning && !jsonSchemaInfo && (
                 <div className={'text-xs text-zinc-500 mb-4'}>
                   JSON Note: IF your original LLM request provided a typed schema / model with the request,
                   these playground outputs will be missing that context, and results may be different.
@@ -353,6 +370,22 @@ export default function PromptPlaygroundPage() {
           </div>
         </div>
       </div>
+
+      {providerWarning && (
+        <ProviderWarningModal
+          isOpen={warningModalOpen}
+          onClose={() => setWarningModalOpen(false)}
+          warning={providerWarning}
+        />
+      )}
+
+      {jsonSchemaInfo && (
+        <JsonSchemaModal
+          isOpen={schemaModalOpen}
+          onClose={() => setSchemaModalOpen(false)}
+          schemaInfo={jsonSchemaInfo}
+        />
+      )}
     </div>
   )
 }
