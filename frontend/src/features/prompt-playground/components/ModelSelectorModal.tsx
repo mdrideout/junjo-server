@@ -201,8 +201,8 @@ function ProductFamilySection({
 }: ProductFamilySectionProps) {
   return (
     <div>
-      {/* Product Family Header (Gemini, Gemma, etc.) */}
-      {provider === 'gemini' && (
+      {/* Product Family Header (Gemini/Gemma for gemini provider, Opus/Sonnet/Haiku for anthropic) */}
+      {(provider === 'gemini' || provider === 'anthropic') && (
         <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-3">
           {familyGroup.displayName}
         </h3>

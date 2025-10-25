@@ -11,6 +11,78 @@ export interface ParsedModelInfo {
 }
 
 /**
+ * Parse an Anthropic model name into its components
+ * Examples:
+ * - claude-3-opus-20240229 → { productFamily: "opus", version: "3", variant: "opus", releaseType: "stable" }
+ * - claude-3-5-sonnet-20240620 → { productFamily: "sonnet", version: "3.5", variant: "sonnet", releaseType: "stable" }
+ * - claude-3-haiku-20240307 → { productFamily: "haiku", version: "3", variant: "haiku", releaseType: "stable" }
+ * - claude-sonnet-4-5-20250929 → { productFamily: "sonnet", version: "4.5", variant: "sonnet", releaseType: "stable" }
+ */
+export function parseAnthropicModel(model: ModelInfo): ParsedModelInfo {
+  const id = model.id.toLowerCase()
+
+  // All Anthropic models are considered stable
+  const releaseType: 'stable' | 'preview' | 'exp' = 'stable'
+
+  // Extract product family (haiku, sonnet, opus)
+  let productFamily = 'unknown'
+  let variant = 'unknown'
+
+  if (id.includes('haiku')) {
+    productFamily = 'haiku'
+    variant = 'haiku'
+  } else if (id.includes('sonnet')) {
+    productFamily = 'sonnet'
+    variant = 'sonnet'
+  } else if (id.includes('opus')) {
+    productFamily = 'opus'
+    variant = 'opus'
+  }
+
+  // Extract version - handle both patterns:
+  // claude-3-opus-... (version 3)
+  // claude-3-5-sonnet-... (version 3.5)
+  // claude-sonnet-4-5-... (version 4.5)
+  let version = '0.0'
+
+  // Try pattern: claude-X-Y-family or claude-family-X-Y
+  const versionMatch1 = id.match(/claude-(\d+)-(\d+)/)
+  const versionMatch2 = id.match(/claude-(?:haiku|sonnet|opus)-(\d+)-(\d+)/)
+
+  if (versionMatch1) {
+    const [, major, minor] = versionMatch1
+    version = minor === '0' ? major : `${major}.${minor}`
+  } else if (versionMatch2) {
+    const [, major, minor] = versionMatch2
+    version = minor === '0' ? major : `${major}.${minor}`
+  } else {
+    // Try single version number: claude-X-family
+    const singleVersionMatch = id.match(/claude-(\d+)-/)
+    if (singleVersionMatch) {
+      version = singleVersionMatch[1]
+    }
+  }
+
+  // Create display name - capitalize the product family
+  const displayName = productFamily.charAt(0).toUpperCase() + productFamily.slice(1)
+
+  // Create sort key: version (descending), then product family
+  // Product family order: opus (highest tier) > sonnet > haiku
+  const familyOrder = productFamily === 'opus' ? 0 : productFamily === 'sonnet' ? 1 : productFamily === 'haiku' ? 2 : 3
+  const sortKey = `${version}-${familyOrder}`
+
+  return {
+    original: model,
+    productFamily,
+    version,
+    variant,
+    releaseType,
+    displayName,
+    sortKey,
+  }
+}
+
+/**
  * Parse a Gemini/Gemma model name into its components
  * Examples:
  * - gemini-2.5-flash-exp → { productFamily: "gemini", version: "2.5", variant: "flash", releaseType: "exp" }
@@ -173,6 +245,64 @@ export function groupGeminiModels(models: ModelInfo[]): ProductFamilyGroup[] {
 }
 
 /**
+ * Group Anthropic models by Product Family (Haiku/Sonnet/Opus) with simple flat structure
+ */
+export function groupAnthropicModels(models: ModelInfo[]): ProductFamilyGroup[] {
+  // Parse all models
+  const parsed = models.map(parseAnthropicModel)
+
+  // Group by product family (haiku, sonnet, opus)
+  const familyMap = new Map<string, ParsedModelInfo[]>()
+  for (const model of parsed) {
+    if (!familyMap.has(model.productFamily)) {
+      familyMap.set(model.productFamily, [])
+    }
+    familyMap.get(model.productFamily)!.push(model)
+  }
+
+  // Build simple structure: Product Family > Models (no version subgroups)
+  const result: ProductFamilyGroup[] = []
+  for (const [productFamily, familyModels] of familyMap) {
+    // Sort models by version descending (newest first), then by model ID
+    familyModels.sort((a, b) => {
+      const versionCompare = parseFloat(b.version) - parseFloat(a.version)
+      if (versionCompare !== 0) return versionCompare
+      return a.original.id.localeCompare(b.original.id)
+    })
+
+    // Create a single version group with all models
+    const versionGroups: VersionGroup[] = [
+      {
+        version: '', // No version header needed
+        releaseTypeGroups: [
+          {
+            releaseType: 'stable',
+            displayName: 'Stable',
+            models: familyModels
+          }
+        ]
+      }
+    ]
+
+    result.push({
+      productFamily,
+      displayName: productFamily.charAt(0).toUpperCase() + productFamily.slice(1),
+      versionGroups,
+    })
+  }
+
+  // Sort product families by tier: Opus > Sonnet > Haiku
+  result.sort((a, b) => {
+    const order = { opus: 0, sonnet: 1, haiku: 2 }
+    const aOrder = order[a.productFamily as keyof typeof order] ?? 99
+    const bOrder = order[b.productFamily as keyof typeof order] ?? 99
+    return aOrder - bOrder
+  })
+
+  return result
+}
+
+/**
  * Filter models by release type
  */
 export function filterModelsByReleaseType(
@@ -199,7 +329,7 @@ export function filterModelsByReleaseType(
 
 /**
  * Organize models into hierarchical groups for display
- * Handles both Gemini (with complex grouping) and other providers (simple list)
+ * Handles Gemini, Anthropic (with complex grouping) and other providers (simple list)
  */
 export function organizeModels(
   models: ModelInfo[],
@@ -211,7 +341,13 @@ export function organizeModels(
     return filterModelsByReleaseType(groups, filters)
   }
 
-  // For non-Gemini providers, create a simple single group structure
+  if (provider === 'anthropic') {
+    const groups = groupAnthropicModels(models)
+    // Anthropic models are all stable, but we still apply the filter for consistency
+    return filterModelsByReleaseType(groups, filters)
+  }
+
+  // For other providers, create a simple single group structure
   return [
     {
       productFamily: provider || 'models',
