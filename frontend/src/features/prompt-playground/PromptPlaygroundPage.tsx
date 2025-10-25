@@ -3,14 +3,15 @@ import { useEffect, useState } from 'react'
 import { OtelSpan } from '../traces/schemas/schemas'
 import { API_HOST } from '../../config'
 import { useAppDispatch, useAppSelector } from '../../root-store/hooks'
-import { geminiTextRequest } from './fetch/gemini-text-request'
+import { unifiedLLMRequest } from './fetch/unified-llm-request'
 import { PromptPlaygroundActions } from './store/slice'
-import { GeminiTextRequest } from './schemas/gemini-text-request'
 import ModelSelector from './components/ModelSelector'
+import ProviderSelector from './components/ProviderSelector'
 import { Switch } from '../../components/catalyst/switch'
 import { getSpanDurationString } from '../../util/duration-utils'
 import CircularProgress from '../../components/CircularProgress'
 import { detectProviderWarnings, detectGeminiJsonSchema } from './utils/provider-warnings'
+import { mapOtelProviderToInternal } from './utils/provider-mapping'
 import ProviderWarningBanner from './components/ProviderWarningBanner'
 import ProviderWarningModal from './components/ProviderWarningModal'
 import JsonSchemaBanner from './components/JsonSchemaBanner'
@@ -26,6 +27,7 @@ export default function PromptPlaygroundPage() {
   const [error, setError] = useState(false)
   const [span, setSpan] = useState<OtelSpan | null>(null)
   const [originalModel, setOriginalModel] = useState<string | null>(null)
+  const [originalProvider, setOriginalProvider] = useState<string | null>(null)
   const [testStartTime, setTestStartTime] = useState<string | null>(null)
   const [testEndTime, setTestEndTime] = useState<string | null>(null)
   const [warningModalOpen, setWarningModalOpen] = useState(false)
@@ -37,21 +39,37 @@ export default function PromptPlaygroundPage() {
     error: outputError,
   } = useAppSelector((state) => state.promptPlaygroundState)
   const selectedModel = useAppSelector((state) => state.promptPlaygroundState.selectedModel)
+  const selectedProvider = useAppSelector((state) => state.promptPlaygroundState.selectedProvider)
   const jsonMode = useAppSelector((state) => state.promptPlaygroundState.jsonMode)
 
   useEffect(() => {
     if (span) {
+      // Extract and set model
       const modelName = span.attributes_json['llm.model_name'] || 'Unknown'
       dispatch(PromptPlaygroundActions.setSelectedModel(modelName))
       setOriginalModel(modelName)
-    }
-    if (span) {
+
+      // Extract and set provider using OpenInference mapping
+      // OpenInference uses "google" for Gemini, we use "gemini" internally
+      const otelProviderName = span.attributes_json['llm.provider']
+      const internalProvider = otelProviderName ? mapOtelProviderToInternal(otelProviderName) : 'gemini'
+      dispatch(PromptPlaygroundActions.setSelectedProvider(internalProvider))
+      setOriginalProvider(internalProvider)
+
+      // Set JSON mode if MIME type is application/json
       const mimeType = span.attributes_json['input.mime_type']
       if (mimeType === 'application/json') {
         dispatch(PromptPlaygroundActions.setJsonMode(true))
       }
     }
   }, [span, dispatch])
+
+  // Reset model selection when provider changes (unless it's the initial load)
+  useEffect(() => {
+    if (selectedProvider && originalProvider && selectedProvider !== originalProvider) {
+      dispatch(PromptPlaygroundActions.setSelectedModel(null))
+    }
+  }, [selectedProvider, originalProvider, dispatch])
 
   useEffect(() => {
     const fetchSpan = async () => {
@@ -157,32 +175,32 @@ export default function PromptPlaygroundPage() {
     setTestEndTime(null)
     const formData = new FormData(event.currentTarget)
     const prompt = formData.get('prompt') as string
-    const model = selectedModel
-    if (!model) {
-      // Handle case where model is not selected
+
+    // Validate required fields
+    if (!selectedModel) {
       console.error('No model selected')
+      dispatch(PromptPlaygroundActions.setError('Please select a model'))
       return
     }
-    const payload: GeminiTextRequest = {
-      model,
-      contents: [{ parts: [{ text: prompt }] }],
-    }
-
-    if (jsonMode) {
-      payload.generationConfig = {
-        responseMimeType: 'application/json',
-      }
+    if (!selectedProvider) {
+      console.error('No provider selected')
+      dispatch(PromptPlaygroundActions.setError('Please select a provider'))
+      return
     }
 
     try {
       dispatch(PromptPlaygroundActions.setOutput(null))
       dispatch(PromptPlaygroundActions.setLoading(true))
       dispatch(PromptPlaygroundActions.setError(null))
-      const result = await geminiTextRequest(payload)
-      if (result.candidates && result.candidates.length > 0) {
-        const text = result.candidates[0].content.parts[0].text
-        dispatch(PromptPlaygroundActions.setOutput(text))
-      }
+
+      const result = await unifiedLLMRequest({
+        provider: selectedProvider,
+        model: selectedModel,
+        prompt,
+        jsonMode,
+      })
+
+      dispatch(PromptPlaygroundActions.setOutput(result.text))
       setTestEndTime(new Date().toISOString())
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error generating content'
@@ -285,7 +303,8 @@ export default function PromptPlaygroundPage() {
               <div className="text-2xl font-bold dark:text-white">Test</div>
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
                 <div className="flex items-center gap-2">
-                  <ModelSelector originalModel={originalModel} />
+                  <ProviderSelector originalProvider={originalProvider} />
+                  <ModelSelector originalModel={originalModel} originalProvider={originalProvider} provider={selectedProvider} />
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={jsonMode}
