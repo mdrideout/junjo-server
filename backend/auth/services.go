@@ -2,7 +2,7 @@ package auth
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -154,7 +154,7 @@ func HandleDeleteUser(c echo.Context) error {
 
 func SignIn(c echo.Context) error {
 	// Log the request
-	log.Printf("request: %v", c.Request())
+	slog.Info("signin request", slog.String("path", c.Request().URL.Path), slog.String("method", c.Request().Method))
 
 	var req SigninRequest
 	if err := c.Bind(&req); err != nil {
@@ -168,14 +168,14 @@ func SignIn(c echo.Context) error {
 	// Validate user credentials
 	user, err := ValidateCredentials(c, req.Email, req.Password)
 	if err != nil {
-		log.Printf("failed to validate credentials: %v", err)
+		slog.Warn("failed to validate credentials", slog.Any("error", err))
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	}
 
 	// Create the session
 	sess, err := session.Get("session", c)
 	if err != nil {
-		log.Printf("failed to get session: %v", err)
+		slog.Error("failed to get session", slog.Any("error", err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get session")
 	}
 
@@ -191,8 +191,8 @@ func SignIn(c echo.Context) error {
 	// IF IN PRODUCTION:
 	// Set the Domain to the production auth domain
 	if os.Getenv("JUNJO_ENV") == "production" {
-		log.Printf("setting production auth domain to %v", os.Getenv("JUNJO_PROD_AUTH_DOMAIN"))
 		authDomain := os.Getenv("JUNJO_PROD_AUTH_DOMAIN")
+		slog.Info("setting production auth domain", slog.String("domain", authDomain))
 		if authDomain != "" {
 			options.Domain = "." + authDomain // covers subdomains
 		}
@@ -204,7 +204,7 @@ func SignIn(c echo.Context) error {
 	// Set session values
 	sess.Values["userEmail"] = user.Email
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		log.Printf("failed to save session: %v", err)
+		slog.Error("failed to save session", slog.Any("error", err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save session")
 	}
 
@@ -217,13 +217,13 @@ func SignOut(c echo.Context) error {
 	// Destroy the session
 	sess, err := session.Get("session", c)
 	if err != nil {
-		log.Printf("failed to get session: %v", err)
+		slog.Error("failed to get session", slog.Any("error", err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get session")
 	}
 
 	sess.Options.MaxAge = -1
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		log.Printf("failed to save session: %v", err)
+		slog.Error("failed to save session", slog.Any("error", err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save session")
 	}
 
@@ -235,7 +235,7 @@ func SignOut(c echo.Context) error {
 func AuthTest(c echo.Context) error {
 	userEmail, err := GetUserEmailFromSession(c)
 	if err != nil {
-		log.Printf("failed to get userEmail from session: %v", err)
+		slog.Error("failed to get userEmail from session", slog.Any("error", err))
 		return echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 	}
 

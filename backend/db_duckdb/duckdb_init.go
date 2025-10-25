@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	_ "github.com/marcboeker/go-duckdb" // Import the DuckDB driver
 )
@@ -22,29 +23,29 @@ var DB *sql.DB
 // Connect initializes the database connection.
 func Connect() error {
 	ctx := context.Background()
-	fmt.Println("Connecting to duckdb...")
 	dbPath := "/dbdata/duckdb/otel_data.db"
 	var err error
+
+	slog.Info("connecting to duckdb", slog.String("path", dbPath))
 
 	// Open the database connection.
 	DB, err = sql.Open("duckdb", dbPath)
 	if err != nil {
 		return fmt.Errorf("failed to open duckdb database: %w", err)
 	}
-	fmt.Println("Opened duckdb.")
 
 	// Ping the database to verify the connection.
 	if err := DB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping duckdb database: %w", err)
 	}
-	fmt.Println("Pinged duckdb.")
 
 	//Initialize Tables
 	if err := initializeTables(ctx); err != nil {
-		log.Fatalf("Failed to initialize tables: %v", err)
+		slog.Error("failed to initialize tables", slog.Any("error", err))
+		os.Exit(1)
 	}
 
-	fmt.Println("duckdb connection established successfully.")
+	slog.Info("duckdb connection established successfully", slog.String("path", dbPath))
 	return nil
 }
 
@@ -88,7 +89,7 @@ func initTable(tableName string, schema string) error {
 		if _, err := DB.ExecContext(ctx, schema); err != nil {
 			return fmt.Errorf("failed to create table '%s': %w", tableName, err)
 		}
-		fmt.Printf("Table '%s' created\n", tableName)
+		slog.Info("duckdb table created", slog.String("table", tableName))
 	}
 	return nil
 }

@@ -2,9 +2,10 @@ package telemetry
 
 import (
 	"context"
-	"database/sql"          // Needed for sql.ErrNoRows
+	"database/sql" // Needed for sql.ErrNoRows
+	"log/slog"
+
 	"junjo-server/api_keys" // Import your api_keys repository
-	"log"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -15,24 +16,24 @@ import (
 // ApiKeyAuthInterceptor checks for a valid API key in the request metadata.
 func ApiKeyAuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	// Log the incoming request
-	log.Printf("Auth Interceptor: Received request for method: %s", info.FullMethod)
+	slog.DebugContext(ctx, "api key auth interceptor: received request", slog.String("method", info.FullMethod))
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		log.Println("Auth Interceptor: Missing metadata")
+		slog.WarnContext(ctx, "api key auth interceptor: missing metadata")
 		return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
 	}
 
 	// Check for the API key header (adjust key name if you used something else)
 	apiKeys := md.Get("x-api-key")
 	if len(apiKeys) == 0 {
-		log.Println("Auth Interceptor: Missing x-api-key header")
+		slog.WarnContext(ctx, "api key auth interceptor: missing x-api-key header")
 		return nil, status.Errorf(codes.Unauthenticated, "API key is required")
 	}
 
 	apiKey := apiKeys[0]
 	if apiKey == "" {
-		log.Println("Auth Interceptor: Empty x-api-key header")
+		slog.WarnContext(ctx, "api key auth interceptor: empty x-api-key header")
 		return nil, status.Errorf(codes.Unauthenticated, "API key cannot be empty")
 	}
 
@@ -40,16 +41,16 @@ func ApiKeyAuthInterceptor(ctx context.Context, req interface{}, info *grpc.Unar
 	_, err := api_keys.GetAPIKey(ctx, apiKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Printf("Auth Interceptor: Invalid API key provided: %s", apiKey)
+			slog.WarnContext(ctx, "api key auth interceptor: invalid api key provided", slog.String("api_key_prefix", apiKey[:min(8, len(apiKey))]))
 			return nil, status.Errorf(codes.Unauthenticated, "invalid API key")
 		}
 		// Handle other potential database errors
-		log.Printf("Auth Interceptor: Error validating API key: %v", err)
+		slog.ErrorContext(ctx, "api key auth interceptor: error validating api key", slog.Any("error", err))
 		return nil, status.Errorf(codes.Internal, "error validating API key")
 	}
 
 	// API key is valid, proceed with the original handler
-	log.Printf("Auth Interceptor: API Key validated successfully for key starting with: %s...", apiKey[:min(8, len(apiKey))])
+	slog.InfoContext(ctx, "api key auth interceptor: api key validated successfully", slog.String("api_key_prefix", apiKey[:min(8, len(apiKey))]))
 	return handler(ctx, req)
 }
 

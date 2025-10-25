@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 )
@@ -20,6 +20,6 @@ func NewOtelLogsService() *OtelLogsService {
 func (s *OtelLogsService) Export(ctx context.Context, req *collogspb.ExportLogsServiceRequest) (*collogspb.ExportLogsServiceResponse, error) {
 	// For now, we just log that we received logs.
 	// In the future, these could also be written to the WAL.
-	log.Printf("Received %d resource logs", len(req.ResourceLogs))
+	slog.InfoContext(ctx, "received resource logs", slog.Int("count", len(req.ResourceLogs)))
 	return &collogspb.ExportLogsServiceResponse{}, nil
 }

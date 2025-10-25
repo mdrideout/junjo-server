@@ -6,8 +6,8 @@ import (
 	"context"
 	"database/sql"
 	"embed" // Import the 'embed' package to include migration files in the binary
-	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/pressly/goose/v3" // Import the Goose library
 	_ "modernc.org/sqlite"
@@ -31,13 +31,15 @@ func Connect() {
 	var err error
 	DB, err = sql.Open("sqlite", dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		slog.Error("failed to open database", slog.String("path", dbPath), slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	if err = DB.Ping(); err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("failed to connect to database", slog.String("path", dbPath), slog.Any("error", err))
+		os.Exit(1)
 	}
-	fmt.Println("Successfully connected to the SQLite database!")
+	slog.Info("successfully connected to sqlite database", slog.String("path", dbPath))
 
 	// --- Goose Migration Logic ---
 	// Tell Goose to use the embedded files as the source for migrations.
@@ -45,32 +47,36 @@ func Connect() {
 
 	// Set the database dialect for Goose.
 	if err := goose.SetDialect("sqlite"); err != nil {
-		log.Fatalf("Failed to set goose dialect: %v", err)
+		slog.Error("failed to set goose dialect", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Run all 'up' migrations. Goose keeps track of which migrations have
 	// already been applied and only runs the new ones.
 	if err := goose.Up(DB, "migrations"); err != nil {
-		log.Fatalf("Failed to run goose migrations: %v", err)
+		slog.Error("failed to run goose migrations", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Println("Database migrations applied successfully!")
+	slog.Info("database migrations applied successfully")
 
 	// --- Safety & Performance PRAGMAs ---
 	// Use DELETE mode (traditional rollback journal) for maximum safety and simplicity.
 	// This is appropriate for low-throughput, critical data like users and API keys.
 	_, err = DB.ExecContext(ctx, "PRAGMA journal_mode=DELETE")
 	if err != nil {
-		log.Fatalf("Failed to set journal mode: %v", err)
+		slog.Error("failed to set journal mode", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Use FULL synchronous mode to ensure every transaction is fully synced to disk
 	// before the commit returns. This prevents data loss on power failure or crash.
 	_, err = DB.ExecContext(ctx, "PRAGMA synchronous=FULL")
 	if err != nil {
-		log.Fatalf("Failed to set synchronous mode: %v", err)
+		slog.Error("failed to set synchronous mode", slog.Any("error", err))
+		os.Exit(1)
 	}
 
-	log.Println("SQLite configured for maximum data safety (DELETE journal, FULL sync)")
+	slog.Info("sqlite configured for maximum data safety", slog.String("journal_mode", "DELETE"), slog.String("synchronous", "FULL"))
 }
 
 // Close safely closes the database connection.

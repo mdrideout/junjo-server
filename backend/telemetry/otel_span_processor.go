@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	db_duckdb "junjo-server/db_duckdb"
@@ -84,7 +84,7 @@ func convertAttributesToJson(attributes []*commonpb.KeyValue) (string, error) {
 				case *commonpb.AnyValue_BoolValue:
 					arr = append(arr, i.BoolValue)
 				default:
-					log.Printf("Unsupported array element type in attribute %s", attr.Key)
+					slog.Warn("unsupported array element type", slog.String("attribute", attr.Key))
 				}
 			}
 			attrMap[attr.Key] = arr
@@ -101,14 +101,14 @@ func convertAttributesToJson(attributes []*commonpb.KeyValue) (string, error) {
 				case *commonpb.AnyValue_BoolValue:
 					kvlistMap[kv.Key] = k.BoolValue
 				default: // Added default case
-					log.Printf("Unsupported kvlist element type in attribute %s", attr.Key)
+					slog.Warn("unsupported kvlist element type", slog.String("attribute", attr.Key))
 				}
 			}
 			attrMap[attr.Key] = kvlistMap
 		case *commonpb.AnyValue_BytesValue:
 			attrMap[attr.Key] = hex.EncodeToString(v.BytesValue)
 		default:
-			log.Printf("Unsupported attribute type: %T for key: %s", v, attr.Key)
+			slog.Warn("unsupported attribute type", slog.String("type", fmt.Sprintf("%T", v)), slog.String("key", attr.Key))
 		}
 	}
 
@@ -269,7 +269,7 @@ func processSpan(tx *sql.Tx, ctx context.Context, service_name string, span *tra
 			nodeID := nodeID
 			_, err = tx.ExecContext(ctx, patchInsertQuery, patchID, service_name, traceID, spanID, workflowID, nodeID, eventTime, patchJSON, patchStoreID)
 			if err != nil {
-				log.Printf("Error inserting patch: %v", err)
+				slog.Error("error inserting patch", slog.Any("error", err))
 			}
 		}
 	}

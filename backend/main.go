@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -17,6 +17,7 @@ import (
 	"junjo-server/db_duckdb"
 	"junjo-server/db_gen"
 	"junjo-server/ingestion_client"
+	"junjo-server/logger"
 	m "junjo-server/middleware"
 	pb "junjo-server/proto_gen"
 	"junjo-server/telemetry"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gorilla/sessions"
+	grpc_logging "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -37,13 +39,16 @@ import (
 )
 
 func main() {
-	fmt.Println("Running main.go function")
-
 	// Load environment variables
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		// Just print to stderr before logger is initialized
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
+
+	// Initialize logger
+	log := logger.InitLogger()
+	log.Info("starting junjo backend service")
 
 	// Host
 	port := "1323"
@@ -57,14 +62,16 @@ func main() {
 	// DuckDB
 	duck_err := db_duckdb.Connect()
 	if duck_err != nil {
-		log.Fatalf("duckdb err: %v", duck_err)
+		log.Error("failed to connect to duckdb", slog.Any("error", duck_err))
+		os.Exit(1)
 	}
 	defer db_duckdb.Close()
 
 	// Ingestion Client
 	ingestionClient, err := ingestion_client.NewClient()
 	if err != nil {
-		log.Fatalf("Failed to create ingestion client: %v", err)
+		log.Error("failed to create ingestion client", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer ingestionClient.Close()
 
@@ -78,30 +85,31 @@ func main() {
 		// At startup, try to load the last processed key from the database.
 		retrievedKey, err := queries.GetPollerState(context.Background())
 		if err != nil && err != sql.ErrNoRows {
-			log.Fatalf("Failed to load poller state: %v", err)
+			log.Error("failed to load poller state", slog.Any("error", err))
+			os.Exit(1)
 		} else if err == sql.ErrNoRows {
-			log.Println("No previous poller state found. Starting from the beginning.")
+			log.Info("no previous poller state found, starting from beginning")
 		} else {
 			lastKey = retrievedKey
-			log.Printf("Resuming poller from last key: %x", lastKey)
+			log.Info("resuming poller", slog.String("last_key", fmt.Sprintf("%x", lastKey)))
 		}
 
 		for range ticker.C {
-			log.Println("Polling for new spans...")
+			log.Debug("polling for new spans")
 			spans, err := ingestionClient.ReadSpans(context.Background(), lastKey, 100)
 			if err != nil {
-				log.Printf("Error reading spans: %v", err)
+				log.Error("error reading spans", slog.Any("error", err))
 				continue
 			}
 
 			if len(spans) > 0 {
 				lastKey = spans[len(spans)-1].KeyUlid
-				log.Printf("Received %d spans. Last key: %x", len(spans), lastKey)
+				log.Info("received spans", slog.Int("count", len(spans)), slog.String("last_key", fmt.Sprintf("%x", lastKey)))
 				var processedSpans []*tracepb.Span
 				for _, receivedSpan := range spans {
 					var span tracepb.Span
 					if err := proto.Unmarshal(receivedSpan.SpanBytes, &span); err != nil {
-						log.Printf("Error unmarshaling span: %v", err)
+						log.Warn("error unmarshaling span", slog.Any("error", err))
 						continue // Skip to the next span
 					}
 					processedSpans = append(processedSpans, &span)
@@ -115,7 +123,7 @@ func main() {
 						// Unmarshal the resource bytes
 						var resource resourcepb.Resource
 						if err := proto.Unmarshal(spans[0].ResourceBytes, &resource); err != nil {
-							log.Printf("Error unmarshaling resource: %v", err)
+							log.Warn("error unmarshaling resource", slog.Any("error", err))
 							serviceName = "NO_SERVICE_NAME"
 						} else {
 							// Extract service name from resource attributes
@@ -136,29 +144,29 @@ func main() {
 					}
 
 					if err := telemetry.BatchProcessSpans(context.Background(), serviceName, processedSpans); err != nil {
-						log.Printf("Error processing spans batch: %v", err)
+						log.Error("error processing spans batch", slog.Any("error", err))
 					} else {
 						// If the batch was processed successfully, update the last key in the database.
 						err := queries.UpsertPollerState(context.Background(), lastKey)
 						if err != nil {
-							log.Printf("Failed to save poller state: %v", err)
+							log.Error("failed to save poller state", slog.Any("error", err))
 						}
 					}
 				}
 			} else {
-				log.Println("No new spans found.")
+				log.Debug("no new spans found")
 			}
 		}
 	}()
 
 	// Initialize Echo
 	e := echo.New()
-	e.Logger.Printf("initialized echo with host:port %s", serverHostPort)
+	log.Info("initialized echo server", slog.String("host_port", serverHostPort))
 	e.Validator = u.NewCustomValidator()
 
 	// Middleware
 	e.Pre(middleware.Recover()) // Recover must be first
-	e.Use(middleware.Logger())
+	e.Use(m.SlogLogger(log))
 
 	// CORS middleware
 	// Must be registered with `Pre` to run before the router, which allows it to handle
@@ -176,7 +184,7 @@ func main() {
 	config.AllowOriginFunc = func(origin string) (bool, error) {
 		allowedOriginsEnv := os.Getenv("JUNJO_ALLOW_ORIGINS")
 		if len(allowedOriginsEnv) == 0 {
-			e.Logger.Infof("CORS check: JUNJO_ALLOW_ORIGINS not set. Allowing origin for local dev: %s", origin)
+			log.Info("cors check: allowing origin for local dev", slog.String("origin", origin))
 			return true, nil
 		}
 
@@ -184,27 +192,28 @@ func main() {
 		for _, allowed := range allowedOrigins {
 			trimmedAllowed := strings.TrimSpace(allowed)
 			if trimmedAllowed == origin {
-				e.Logger.Infof("CORS check: Allowing origin (exact match): %s", origin)
+				log.Info("cors check: allowing origin (exact match)", slog.String("origin", origin))
 				return true, nil
 			}
 		}
 
-		e.Logger.Warnf("CORS check: Denying origin: %s. Not in JUNJO_ALLOW_ORIGINS.", origin)
+		log.Warn("cors check: denying origin", slog.String("origin", origin), slog.String("reason", "not in JUNJO_ALLOW_ORIGINS"))
 		return false, nil
 	}
 
 	// Log the configured origins for clarity on startup
 	if len(allowedOriginsEnv) > 0 {
-		e.Logger.Printf("CORS Allowed Origins configured via JUNJO_ALLOW_ORIGINS: %s", allowedOriginsEnv)
+		log.Info("cors allowed origins configured", slog.String("origins", allowedOriginsEnv))
 	} else {
-		e.Logger.Printf("CORS Allowed Origins not set. Reflecting any origin.")
+		log.Info("cors allowed origins not set, reflecting any origin")
 	}
 	e.Pre(middleware.CORSWithConfig(config))
 
 	// Session Middleware
 	sessionSecret := os.Getenv("JUNJO_SESSION_SECRET")
 	if sessionSecret == "" {
-		log.Fatal("JUNJO_SESSION_SECRET environment variable is not set")
+		log.Error("JUNJO_SESSION_SECRET environment variable is not set")
+		os.Exit(1)
 	}
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte(sessionSecret))))
 
@@ -242,16 +251,25 @@ func main() {
 		internalGrpcAddr := ":50053"
 		lis, err := net.Listen("tcp", internalGrpcAddr)
 		if err != nil {
-			log.Fatalf("Failed to listen for internal gRPC: %v", err)
+			log.Error("failed to listen for internal grpc", slog.Any("error", err))
+			os.Exit(1)
 		}
 
-		grpcServer := grpc.NewServer()
+		grpcServer := grpc.NewServer(
+			grpc.UnaryInterceptor(
+				grpc_logging.UnaryServerInterceptor(
+					logger.InterceptorLogger(log),
+					grpc_logging.WithLogOnEvents(grpc_logging.FinishCall),
+				),
+			),
+		)
 		internalAuthSvc := internal_auth.NewInternalAuthService()
 		pb.RegisterInternalAuthServiceServer(grpcServer, internalAuthSvc)
 
-		log.Printf("Internal gRPC server listening at %v", lis.Addr())
+		log.Info("internal grpc server listening", slog.String("address", lis.Addr().String()))
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve internal gRPC: %v", err)
+			log.Error("failed to serve internal grpc", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}()
 

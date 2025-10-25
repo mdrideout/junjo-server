@@ -3,9 +3,10 @@ package backend_client
 import (
 	"context"
 	"fmt"
-	pb "junjo-server/ingestion-service/proto_gen"
-	"log"
+	"log/slog"
 	"time"
+
+	pb "junjo-server/ingestion-service/proto_gen"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -34,7 +35,7 @@ func NewAuthClient() (*AuthClient, error) {
 		return nil, err
 	}
 
-	log.Printf("Created gRPC client for backend auth service at %s", addr)
+	slog.Info("created grpc client for backend auth", slog.String("address", addr))
 
 	return &AuthClient{
 		conn:   conn,
@@ -69,7 +70,7 @@ func (c *AuthClient) ValidateApiKey(ctx context.Context, apiKey string) (bool, e
 		grpc.WaitForReady(true), // Wait for backend to be ready, but respect timeout
 	)
 	if err != nil {
-		log.Printf("Failed to validate API key with backend: %v", err)
+		slog.Error("failed to validate api key with backend", slog.Any("error", err))
 		return false, fmt.Errorf("backend validation failed: %w", err)
 	}
 
@@ -80,7 +81,7 @@ func (c *AuthClient) ValidateApiKey(ctx context.Context, apiKey string) (bool, e
 // This should be called once at startup to ensure the backend is ready before
 // accepting traffic.
 func (c *AuthClient) WaitUntilReady(ctx context.Context) error {
-	log.Println("Waiting for backend gRPC server to be ready...")
+	slog.Info("waiting for backend grpc server to be ready")
 
 	// Try to validate a dummy key - we don't care about the result,
 	// just that the backend responds
@@ -97,6 +98,6 @@ func (c *AuthClient) WaitUntilReady(ctx context.Context) error {
 		return fmt.Errorf("backend did not become ready: %w", err)
 	}
 
-	log.Println("Backend gRPC server is ready!")
+	slog.Info("backend grpc server is ready")
 	return nil
 }
