@@ -70,7 +70,7 @@ func main() {
 
 	// Start a background goroutine to poll for spans
 	go func() {
-		ticker := time.NewTicker(5 * time.Second) // Poll every 3 seconds
+		ticker := time.NewTicker(5 * time.Second) // Poll every 5 seconds
 		defer ticker.Stop()
 
 		queries := db_gen.New(db.DB)
