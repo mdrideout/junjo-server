@@ -7,7 +7,9 @@ by actual environment variables.
 Pattern validated for high-concurrency asyncio environments.
 """
 
+from pathlib import Path
 from typing import Annotated
+
 from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,27 +20,31 @@ class DatabaseSettings(BaseSettings):
     sqlite_path: Annotated[
         str,
         Field(
-            default="./dbdata/junjo.db",
-            description="Path to SQLite database file"
+            default="../.dbdata/sqlite/junjo.db",
+            description="Path to SQLite database file (relative to backend_python/)"
         )
     ]
     duckdb_path: Annotated[
         str,
         Field(
-            default="./dbdata/traces.duckdb",
-            description="Path to DuckDB database file"
+            default="../.dbdata/duckdb/traces.duckdb",
+            description="Path to DuckDB database file (relative to backend_python/)"
         )
     ]
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def sqlite_url(self) -> str:
-        """Computed SQLite async URL.
+        """Computed SQLite async URL with absolute path.
 
         Returns:
-            SQLite connection URL for async SQLAlchemy engine.
+            SQLite connection URL for async SQLAlchemy engine with absolute path.
         """
-        return f"sqlite+aiosqlite:///{self.sqlite_path}"
+        # Resolve to absolute path (handles relative paths from any working directory)
+        abs_path = Path(self.sqlite_path).resolve()
+        # Ensure parent directory exists
+        abs_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite+aiosqlite:///{abs_path}"
 
     model_config = SettingsConfigDict(
         env_prefix="DB_",

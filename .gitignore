@@ -6,8 +6,13 @@ tmp
 .env
 
 # Database files
-dbdata/
+# All local/dev database data stored in .dbdata/ directory:
+#   .dbdata/sqlite/     - SQLite databases (Python/Go backends)
+#   .dbdata/duckdb/     - DuckDB analytics data
+#   .dbdata/badgerdb/   - Ingestion service data
 .dbdata/
+dbdata/                    # Legacy - can be removed after migration
+wal-data/                  # Legacy - can be removed after migration
 *.db
 *.db-shm
 *.db-wal

@@ -26,7 +26,6 @@ from app.database.base import Base
 # Import all models DIRECTLY (CRITICAL - ensures Alembic sees all tables)
 # Add new models here as they are created
 from app.database.users.models import UserTable  # noqa: F401
-from app.database.sessions.models import SessionTable  # noqa: F401
 # Future models:
 # from app.database.api_keys.models import APIKeyTable  # noqa: F401
 

@@ -2,11 +2,13 @@
 
 ## Overview
 
-This phase implements the authentication system using session cookies, mirroring the current Go implementation. The auth system uses:
-- **Session Storage**: Cookie-based sessions signed with a secret key
+This phase implements the authentication system using encrypted session cookies, matching the security level of the Go implementation. The auth system uses:
+- **Session Storage**: Encrypted + signed cookie-based sessions (starlette-securecookies + SessionMiddleware)
 - **Password Hashing**: bcrypt for secure password storage
-- **Session Middleware**: FastAPI dependency injection for route protection
+- **Session Middleware**: FastAPI/Starlette middleware for automatic encryption/decryption
 - **User Model**: SQLAlchemy model with email/password authentication
+
+**Key Security Feature**: Unlike the default SessionMiddleware (which only signs cookies), this implementation uses `starlette-securecookies` to provide **both encryption and signing**, matching the security level of Go's gorilla/sessions with cookie store.
 
 ## Current Go Implementation Analysis
 
@@ -54,6 +56,56 @@ CREATE INDEX idx_users_email ON users (email);
 - POST `/users` - Create user (auth required)
 - GET `/users` - List users (auth required)
 - DELETE `/users/:id` - Delete user (auth required)
+
+## Python Implementation Strategy
+
+### Security Model: Encryption + Signing
+
+The Python implementation uses **two middlewares** to achieve the same security level as Go's `gorilla/sessions`:
+
+1. **SecureCookiesMiddleware** (outer layer)
+   - Provides **ENCRYPTION** (confidentiality)
+   - Uses AES-256 with a 32-byte key
+   - Prevents users from reading cookie contents (even after Base64 decoding)
+
+2. **SessionMiddleware** (inner layer)
+   - Provides **SIGNING** (integrity)
+   - Uses HMAC with `itsdangerous`
+   - Prevents users from tampering with cookie contents
+
+### Request/Response Flow
+
+**Incoming Request (Sign-in validation):**
+```
+Browser → [Encrypted Cookie]
+         ↓
+SecureCookiesMiddleware → Decrypts cookie using SECURE_COOKIE_KEY
+         ↓
+SessionMiddleware → Validates signature using SESSION_SECRET
+         ↓
+request.session populated with {"userEmail": "user@example.com"}
+         ↓
+Your route handler can access request.session["userEmail"]
+```
+
+**Outgoing Response (After sign-in):**
+```
+Your route: request.session["userEmail"] = "user@example.com"
+         ↓
+SessionMiddleware → Signs session data using SESSION_SECRET
+         ↓
+SecureCookiesMiddleware → Encrypts cookie using SECURE_COOKIE_KEY
+         ↓
+Browser receives [Encrypted + Signed Cookie]
+```
+
+### Why This Approach?
+
+- **No database sessions needed** (table-less, like Go implementation)
+- **Automatic encryption/decryption** by middleware (no manual cookie handling)
+- **Simple route code**: Just use `request.session["key"]` directly
+- **Same security level as Go**: Both encryption AND signing
+- **Standard Starlette middleware**: Well-tested, maintained by Starlette community
 
 ## Python Implementation
 
@@ -375,32 +427,22 @@ class AuthTestResponse(BaseModel):
     user_email: EmailStr
 ```
 
-### 4. Password Hashing & Session Utilities
+### 4. Password Hashing Utilities
 
 **File**: `app/features/auth/utils.py`
 
 ```python
 """
-Authentication utilities for password hashing and session management.
+Authentication utilities for password hashing.
+
+Note: Session management is handled by middleware (SecureCookiesMiddleware + SessionMiddleware).
+No custom cookie signing/encryption needed.
 """
 
-import secrets
-from typing import Optional
-
-from itsdangerous import BadSignature, URLSafeTimedSerializer
 from passlib.context import CryptContext
-
-from app.core.settings import settings
 
 # Password hashing context (bcrypt with default cost, matching Go implementation)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Session serializer for cookie signing
-# Uses itsdangerous to sign/verify session cookies
-session_serializer = URLSafeTimedSerializer(
-    settings.session_secret,
-    salt="session-cookie",
-)
 
 
 def hash_password(password: str) -> str:
@@ -432,39 +474,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True if password matches, False otherwise
     """
     return pwd_context.verify(plain_password, hashed_password)
-
-
-def create_session_cookie(user_email: str) -> str:
-    """
-    Create a signed session cookie value.
-
-    Args:
-        user_email: User email to store in session
-
-    Returns:
-        Signed cookie value (URL-safe string)
-    """
-    # Add some entropy to prevent timing attacks
-    session_data = {"userEmail": user_email, "nonce": secrets.token_hex(16)}
-    return session_serializer.dumps(session_data)
-
-
-def verify_session_cookie(cookie_value: str, max_age: int = 86400 * 30) -> Optional[str]:
-    """
-    Verify and decode a session cookie.
-
-    Args:
-        cookie_value: Signed cookie value from request
-        max_age: Maximum age in seconds (default: 30 days)
-
-    Returns:
-        User email if valid, None if invalid or expired
-    """
-    try:
-        session_data = session_serializer.loads(cookie_value, max_age=max_age)
-        return session_data.get("userEmail")
-    except (BadSignature, KeyError):
-        return None
 ```
 
 ### 5. Authentication Dependencies
@@ -476,26 +485,25 @@ def verify_session_cookie(cookie_value: str, max_age: int = 86400 * 30) -> Optio
 FastAPI dependencies for authentication.
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException, status
-
-from app.features.auth.utils import verify_session_cookie
+from fastapi import Depends, HTTPException, Request, status
 
 
-async def get_current_user_email(
-    session: Annotated[Optional[str], Cookie()] = None,
-) -> str:
+async def get_current_user_email(request: Request) -> str:
     """
-    Dependency to get current user email from session cookie.
+    Dependency to get current user email from session.
+
+    Session is automatically decrypted and validated by middleware stack:
+    1. SecureCookiesMiddleware decrypts the cookie
+    2. SessionMiddleware validates signature and populates request.session
 
     Mirrors the Go middleware auth check:
-    - Reads session cookie
-    - Verifies signature and expiration
-    - Returns user email
+    - Reads userEmail from request.session
+    - Returns user email if present
 
     Args:
-        session: Session cookie value (automatically extracted by FastAPI)
+        request: FastAPI request object (with session populated by middleware)
 
     Returns:
         User email from session
@@ -503,17 +511,12 @@ async def get_current_user_email(
     Raises:
         HTTPException: 401 if session is invalid or missing
     """
-    if session is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized: No valid session",
-        )
+    user_email = request.session.get("userEmail")
 
-    user_email = verify_session_cookie(session)
     if user_email is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized: Invalid or expired session",
+            detail="Unauthorized: No valid session",
         )
 
     return user_email
@@ -649,10 +652,9 @@ Authentication router.
 Implements all authentication endpoints, mirroring the Go implementation.
 """
 
-import os
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 
 from app.core.logger import logger
@@ -666,38 +668,11 @@ from app.database.users.schemas import (
 )
 from app.features.auth.dependencies import CurrentUserEmail
 from app.features.auth.service import AuthService
-from app.features.auth.utils import create_session_cookie
 
 router = APIRouter()
 
-
-# --- Session Configuration (mirrors Go implementation) ---
-SESSION_COOKIE_NAME = "session"
-SESSION_MAX_AGE = 86400 * 30  # 30 days
-SESSION_PATH = "/"
-SESSION_HTTPONLY = True
-SESSION_SECURE = True  # HTTPS in production
-SESSION_SAMESITE = "strict"
-
-# Production domain support (mirrors Go implementation)
-JUNJO_ENV = os.getenv("JUNJO_ENV", "development")
-JUNJO_PROD_AUTH_DOMAIN = os.getenv("JUNJO_PROD_AUTH_DOMAIN", "")
-
-
-def get_session_domain() -> str | None:
-    """
-    Get session cookie domain based on environment.
-
-    Mirrors Go logic:
-    if os.Getenv("JUNJO_ENV") == "production" {
-        options.Domain = "." + authDomain  // covers subdomains
-    }
-    """
-    if JUNJO_ENV == "production" and JUNJO_PROD_AUTH_DOMAIN:
-        domain = f".{JUNJO_PROD_AUTH_DOMAIN}"
-        logger.info(f"Setting production auth domain: {domain}")
-        return domain
-    return None
+# Note: Session configuration (max_age, secure, samesite, etc.) is handled
+# in main.py when adding SessionMiddleware. No need to configure here.
 
 
 # --- Public Endpoints (no auth required) ---
@@ -733,55 +708,43 @@ async def create_first_user(request: CreateUserRequest):
 
 
 @router.post("/sign-in", response_model=UserResponse)
-async def sign_in(request: SignInRequest, response: Response):
+async def sign_in(sign_in_request: SignInRequest, request: Request):
     """
     Sign in with email and password.
 
-    Creates a session cookie on successful authentication.
+    Sets userEmail in request.session, which is automatically:
+    1. Signed by SessionMiddleware (integrity)
+    2. Encrypted by SecureCookiesMiddleware (confidentiality)
+
     Mirrors Go implementation in /backend/auth/services.go:155-214.
     """
-    logger.info(f"Sign-in request for email: {request.email}")
+    logger.info(f"Sign-in request for email: {sign_in_request.email}")
 
     # Validate credentials
-    user = await AuthService.validate_credentials(request.email, request.password)
+    user = await AuthService.validate_credentials(sign_in_request.email, sign_in_request.password)
     if user is None:
-        logger.warning(f"Failed to validate credentials for: {request.email}")
+        logger.warning(f"Failed to validate credentials for: {sign_in_request.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
 
-    # Create signed session cookie
-    session_cookie_value = create_session_cookie(user.email)
-
-    # Set session cookie with configuration matching Go implementation
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=session_cookie_value,
-        max_age=SESSION_MAX_AGE,
-        path=SESSION_PATH,
-        domain=get_session_domain(),
-        httponly=SESSION_HTTPONLY,
-        secure=SESSION_SECURE,
-        samesite=SESSION_SAMESITE,
-    )
+    # Set user email in session (middleware handles encryption + signing)
+    request.session["userEmail"] = user.email
 
     return UserResponse(message="signed in")
 
 
 @router.post("/sign-out", response_model=UserResponse)
-async def sign_out(response: Response):
+async def sign_out(request: Request):
     """
-    Sign out by destroying the session cookie.
+    Sign out by clearing the session.
 
-    Mirrors Go implementation: sets MaxAge to -1.
+    SessionMiddleware automatically deletes the cookie when session is cleared.
+    Mirrors Go implementation.
     """
-    # Delete the session cookie (MaxAge = -1)
-    response.delete_cookie(
-        key=SESSION_COOKIE_NAME,
-        path=SESSION_PATH,
-        domain=get_session_domain(),
-    )
+    # Clear session (middleware handles cookie deletion)
+    request.session.clear()
 
     return UserResponse(message="signed out")
 
@@ -843,21 +806,66 @@ async def delete_user(user_id: int, current_user_email: CurrentUserEmail):
     return UserResponse(message="User deleted successfully")
 ```
 
-### 8. Update `main.py`
+### 8. Update `main.py` - Middleware Setup
 
-**File**: `app/main.py` (add auth router)
+**File**: `app/main.py`
+
+**CRITICAL: Middleware order matters!** SecureCookiesMiddleware must be added FIRST (outer layer).
 
 ```python
-# Add import
+from fastapi import FastAPI
+from starlette.middleware.sessions import SessionMiddleware
+from securecookies import SecureCookiesMiddleware
+
+from app.config.settings import settings
 from app.features.auth.router import router as auth_router
 
-# In create_app() function, add auth router:
-app.include_router(auth_router, tags=["auth"])
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="Junjo Server",
+        description="Junjo Python Backend",
+        version="0.1.0",
+    )
+
+    # === MIDDLEWARE SETUP (ORDER IS CRITICAL!) ===
+
+    # 1. Add ENCRYPTION middleware FIRST (outer layer)
+    #    This encrypts/decrypts all cookies before they reach SessionMiddleware
+    app.add_middleware(
+        SecureCookiesMiddleware,
+        secrets=[settings.secure_cookie_key]  # 32-byte encryption key
+    )
+
+    # 2. Add SESSION middleware SECOND (inner layer)
+    #    This signs/validates session data
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.session_secret,  # Signing key
+        max_age=86400 * 30,  # 30 days (matches Go implementation)
+        https_only=True,      # HTTPS in production
+        same_site="strict",   # CSRF protection
+    )
+
+    # === REQUEST/RESPONSE FLOW ===
+    # Incoming:  Browser → SecureCookiesMiddleware (decrypt) → SessionMiddleware (verify signature) → request.session populated
+    # Outgoing:  request.session modified → SessionMiddleware (sign) → SecureCookiesMiddleware (encrypt) → Browser
+
+    # === ROUTERS ===
+    app.include_router(auth_router, tags=["auth"])
+
+    return app
+
+
+app = create_app()
 ```
 
 ### 9. Update Settings
 
-**File**: `app/core/settings.py` (add session secret)
+**File**: `app/core/settings.py`
+
+**CRITICAL: Two separate keys required!**
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -865,7 +873,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # ... existing settings ...
 
-    # Session secret for cookie signing
+    # Session encryption key (MUST be exactly 32 bytes for AES-256)
+    # Generate with: python -c "import secrets; print(secrets.token_bytes(32))"
+    secure_cookie_key: bytes  # REQUIRED: set JUNJO_SECURE_COOKIE_KEY in .env
+
+    # Session signing secret (can be any length)
+    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
     session_secret: str  # REQUIRED: set JUNJO_SESSION_SECRET in .env
 
     # Environment for production domain support
@@ -941,58 +954,7 @@ def test_hash_password_different_each_time():
     assert verify_password(password, hash2) is True
 ```
 
-**File**: `tests/unit/features/auth/test_session_utils.py`
-
-```python
-"""Unit tests for session utilities."""
-
-import pytest
-
-from app.features.auth.utils import create_session_cookie, verify_session_cookie
-
-
-@pytest.mark.unit
-def test_create_session_cookie():
-    """Test session cookie creation."""
-    user_email = "test@example.com"
-    cookie = create_session_cookie(user_email)
-
-    # Should return a non-empty string
-    assert isinstance(cookie, str)
-    assert len(cookie) > 0
-
-
-@pytest.mark.unit
-def test_verify_session_cookie_valid():
-    """Test session cookie verification with valid cookie."""
-    user_email = "test@example.com"
-    cookie = create_session_cookie(user_email)
-
-    # Should verify correctly
-    verified_email = verify_session_cookie(cookie)
-    assert verified_email == user_email
-
-
-@pytest.mark.unit
-def test_verify_session_cookie_invalid():
-    """Test session cookie verification with invalid cookie."""
-    invalid_cookie = "invalid_cookie_value"
-
-    # Should return None for invalid cookie
-    verified_email = verify_session_cookie(invalid_cookie)
-    assert verified_email is None
-
-
-@pytest.mark.unit
-def test_verify_session_cookie_expired():
-    """Test session cookie verification with expired cookie."""
-    user_email = "test@example.com"
-    cookie = create_session_cookie(user_email)
-
-    # Verify with max_age=0 (immediately expired)
-    verified_email = verify_session_cookie(cookie, max_age=0)
-    assert verified_email is None
-```
+**Note**: Session cookie utilities tests are not needed. Session encryption/decryption is handled entirely by middleware and is tested at the integration level (via actual HTTP requests).
 
 **File**: `tests/unit/features/auth/test_user_repository.py`
 
@@ -1365,9 +1327,16 @@ Add to `pyproject.toml`:
 [project]
 dependencies = [
     # ... existing dependencies ...
-    "passlib[bcrypt]>=1.7.4",  # Password hashing with bcrypt
-    "itsdangerous>=2.1.2",      # Cookie signing for sessions
+    "passlib[bcrypt]>=1.7.4",       # Password hashing with bcrypt
+    "starlette-securecookies>=1.1.0", # Cookie encryption (AES-256)
+    "itsdangerous>=2.1.2",           # Required by SessionMiddleware for signing
 ]
+```
+
+Install:
+```bash
+cd backend_python
+uv sync
 ```
 
 ## Migration Script (Alembic)
@@ -1425,9 +1394,19 @@ def downgrade() -> None:
 Add to `.env`:
 
 ```bash
-# Session secret for cookie signing (REQUIRED)
+# === Session Security (TWO KEYS REQUIRED) ===
+
+# 1. Encryption key for SecureCookiesMiddleware (MUST be exactly 32 bytes)
+# This provides CONFIDENTIALITY - user cannot read cookie data
+# Generate with: python -c "import secrets; print(secrets.token_bytes(32))"
+JUNJO_SECURE_COOKIE_KEY=b'\x...\x...' # Example output from command above
+
+# 2. Signing secret for SessionMiddleware (any length)
+# This provides INTEGRITY - user cannot tamper with cookie data
 # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
-JUNJO_SESSION_SECRET=your-secret-key-here
+JUNJO_SESSION_SECRET=your-signing-secret-here
+
+# === Optional Settings ===
 
 # Environment (optional, defaults to "development")
 JUNJO_ENV=development
@@ -1436,6 +1415,12 @@ JUNJO_ENV=development
 # Example: "junjo.io" (will be set as ".junjo.io" to cover subdomains)
 JUNJO_PROD_AUTH_DOMAIN=
 ```
+
+**Security Notes:**
+- **Two different keys** are required for defense in depth
+- The encryption key MUST be exactly 32 bytes (AES-256 requirement)
+- Never commit these keys to version control
+- Use different keys for development/staging/production
 
 ## Phase Completion Criteria
 
@@ -1454,16 +1439,28 @@ JUNJO_PROD_AUTH_DOMAIN=
 
 ## Notes
 
-1. **Session Storage**: Using signed cookies (itsdangerous) instead of server-side session storage. This matches the Go implementation using gorilla/sessions with cookie store.
+1. **Session Storage - Encryption + Signing**: Using `starlette-securecookies` + `SessionMiddleware` for encrypted and signed cookies. This provides the same security level as Go's gorilla/sessions with cookie store:
+   - **Encryption** (SecureCookiesMiddleware): User cannot read cookie contents (confidentiality)
+   - **Signing** (SessionMiddleware): User cannot tamper with cookie contents (integrity)
+   - No database storage needed (table-less sessions)
 
-2. **CSRF Protection**: FastAPI doesn't have built-in CSRF like Echo. Consider adding `fastapi-csrf-protect` if needed, or rely on SameSite=Strict + CORS for protection.
+2. **Middleware Order is Critical**: SecureCookiesMiddleware MUST be added first (outer layer), SessionMiddleware second (inner layer). This ensures cookies are encrypted before being sent to the browser and decrypted before signature validation.
 
-3. **Password Hashing**: Using passlib with bcrypt, which is compatible with Go's bcrypt implementation.
+3. **Two Keys Required**:
+   - `JUNJO_SECURE_COOKIE_KEY`: 32 bytes for AES-256 encryption
+   - `JUNJO_SESSION_SECRET`: Any length for HMAC signing
+   - Never use the same key for both (defense in depth)
 
-4. **Dependency Injection**: FastAPI's dependency system is more elegant than Echo's middleware. Auth is enforced at the route level via `CurrentUserEmail` dependency.
+4. **CSRF Protection**: Using SameSite=Strict cookie setting for CSRF protection. FastAPI doesn't have built-in CSRF middleware like Echo, but SameSite=Strict provides strong protection for modern browsers.
 
-5. **Defense in Depth**: Following AGENTS.md principle - auth checked in both router (dependency) and potentially in service layer for sensitive operations.
+5. **Password Hashing**: Using passlib with bcrypt (default cost), compatible with Go's bcrypt.GenerateFromPassword.
 
-6. **Session Expiration**: 30 days default, matching Go implementation. Automatically enforced by itsdangerous `max_age` parameter.
+6. **Dependency Injection**: FastAPI's dependency system is more elegant than Echo's middleware. Auth is enforced at the route level via `CurrentUserEmail` dependency, which reads from `request.session["userEmail"]`.
 
-7. **Production Domain**: Subdomain support via "." prefix, matching Go implementation.
+7. **Session Expiration**: 30 days default (set in SessionMiddleware `max_age`), matching Go implementation.
+
+8. **Production Domain**: Subdomain support via "." prefix when `JUNJO_ENV=production`, matching Go implementation.
+
+9. **Simplified Code**: No custom cookie signing/verification needed. Middleware handles all encryption/decryption automatically. Routes just use `request.session` directly.
+
+10. **Defense in Depth**: Following AGENTS.md principle - auth checked in both router (dependency) and potentially in service layer for sensitive operations.

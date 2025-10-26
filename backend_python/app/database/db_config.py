@@ -15,24 +15,22 @@ SQLite Idiosyncrasies:
 See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 """
 
-from sqlalchemy import event, text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from loguru import logger
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config.settings import settings
 
-
-# Create async engine with SQLite-specific settings
+# Create the async engine
 engine = create_async_engine(
     settings.database.sqlite_url,
-    echo=settings.debug,  # Log SQL queries in debug mode
+    echo=settings.debug,  # Set to True to see SQL queries in debug mode
     connect_args={"check_same_thread": False},  # Required for async SQLite
 )
 
 
-# Set PRAGMA settings for every new SQLite connection
-# These are critical for SQLite performance and safety
+# Set PRAGMA settings for every new connection
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragmas(dbapi_connection, connection_record):
     """Configure SQLite PRAGMA settings on connection.
@@ -53,7 +51,7 @@ def set_sqlite_pragmas(dbapi_connection, connection_record):
     cursor.close()
 
 
-# Create async session factory
+# Create the async session factory
 # CRITICAL: expire_on_commit=False prevents lazy loading errors in async contexts
 async_session = async_sessionmaker(
     engine,
@@ -62,15 +60,15 @@ async_session = async_sessionmaker(
 
 logger.info(f"Database engine created: {settings.database.sqlite_path}")
 
-
 # Instrument SQLAlchemy for OpenTelemetry
 SQLAlchemyInstrumentor().instrument(
-    engine=engine.sync_engine,  # .sync_engine required for instrumentation
+    engine=engine.sync_engine,
     enable_commenter=True,
 )
 
 
-# FastAPI dependency (optional - most code uses static repository pattern)
+
+# Dependency to get DB session
 async def get_db():
     """FastAPI dependency to get database session.
 

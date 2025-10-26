@@ -7,7 +7,7 @@ See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.database.db_config import async_session
+from app.database import db_config
 from app.database.users.models import UserTable
 from app.database.users.schemas import UserRead, UserInDB
 
@@ -46,7 +46,7 @@ class UserRepository:
                 password_hash=password_hash
             )
 
-            async with async_session() as session:
+            async with db_config.async_session() as session:
                 session.add(db_obj)
                 await session.commit()
                 await session.refresh(db_obj)
@@ -71,7 +71,7 @@ class UserRepository:
             SQLAlchemyError: If database operation fails
         """
         try:
-            async with async_session() as session:
+            async with db_config.async_session() as session:
                 stmt = select(UserTable).where(UserTable.email == email)
                 result = await session.execute(stmt)
                 db_obj = result.scalar_one_or_none()
@@ -97,7 +97,7 @@ class UserRepository:
             SQLAlchemyError: If database operation fails
         """
         try:
-            async with async_session() as session:
+            async with db_config.async_session() as session:
                 stmt = select(UserTable).where(UserTable.id == user_id)
                 result = await session.execute(stmt)
                 db_obj = result.scalar_one_or_none()

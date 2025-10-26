@@ -7,12 +7,12 @@ services:
     ports:
       - "1323:1323"
     environment:
-      - SQLITE_DB_PATH=/dbdata/junjo.db
-      - DUCKDB_PATH=/dbdata/traces.duckdb
+      - SQLITE_DB_PATH=/dbdata/sqlite/junjo.db
+      - DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
       - INGESTION_SERVICE_INTERNAL_HOST=junjo-server-ingestion
       - INGESTION_SERVICE_INTERNAL_PORT=50052
     volumes:
-      - ./dbdata:/dbdata
+      - ./.dbdata:/dbdata  # Consolidated storage location
     depends_on:
       - junjo-server-ingestion
     networks:
@@ -29,20 +29,20 @@ services:
     environment:
       - DEBUG=true
       - APP_NAME=Junjo Server (Python)
-      - DB_SQLITE_PATH=/dbdata/junjo.db
-      - DB_DUCKDB_PATH=/dbdata/traces.duckdb
+      - DB_SQLITE_PATH=/dbdata/sqlite/junjo.db
+      - DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
       - INGESTION_HOST=junjo-server-ingestion
       - INGESTION_PORT=50052
       - CORS_ORIGINS=["http://localhost:5151"]
     volumes:
-      - ./dbdata:/dbdata
+      - ./.dbdata:/dbdata  # Consolidated storage location
       - ./backend_python/app:/app/app  # Hot reload
     depends_on:
       - junjo-server-ingestion
     networks:
       - junjo-network
 
-  # Ingestion service (unchanged)
+  # Ingestion service
   junjo-server-ingestion:
     build:
       context: ./ingestion-service
@@ -51,9 +51,9 @@ services:
       - "50051:50051"  # Public gRPC
       - "50052:50052"  # Internal gRPC
     environment:
-      - BADGERDB_PATH=/wal-data
+      - BADGERDB_PATH=/dbdata/badgerdb
     volumes:
-      - ./wal-data:/wal-data
+      - ./.dbdata/badgerdb:/dbdata/badgerdb  # Consolidated storage location
     networks:
       - junjo-network
 

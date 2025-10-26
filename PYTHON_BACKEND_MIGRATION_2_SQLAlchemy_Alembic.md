@@ -14,8 +14,8 @@ This phase establishes database infrastructure with:
 - **SQLAlchemy 2.0** (async ORM with modern syntax)
 - **Alembic** (database migrations)
 - **High-concurrency pattern** (validated from wt_api_v2)
-- **SQLite** for application data (users, sessions, API keys)
-- Initial schema for authentication (users, sessions tables)
+- **SQLite** for application data (users, API keys)
+- Initial schema for authentication (users table only - sessions are cookie-based)
 - Database session management with `expire_on_commit=False`
 - Testing database setup
 
@@ -46,17 +46,11 @@ backend_python/
 │   │   ├── base.py                  # SQLAlchemy Base
 │   │   ├── db_config.py             # Engine & session factory
 │   │   │
-│   │   ├── users/                   # Users feature
-│   │   │   ├── __init__.py
-│   │   │   ├── models.py            # UserTable
-│   │   │   ├── schemas.py           # UserRead, UserCreate
-│   │   │   └── repository.py        # UserRepository
-│   │   │
-│   │   └── sessions/                # Sessions feature (for cookie auth)
+│   │   └── users/                   # Users feature
 │   │       ├── __init__.py
-│   │       ├── models.py            # SessionTable
-│   │       ├── schemas.py           # SessionRead, SessionCreate
-│   │       └── repository.py        # SessionRepository
+│   │       ├── models.py            # UserTable
+│   │       ├── schemas.py           # UserRead, UserCreate
+│   │       └── repository.py        # UserRepository
 │   │
 │   └── common/
 │       └── utils.py                 # generate_id() utility
@@ -483,178 +477,7 @@ class UserRepository:
             raise e
 ```
 
-### 8. `app/database/sessions/models.py` - Session Model
-
-```python
-"""
-Session database model for cookie-based authentication.
-"""
-
-from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, Text
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
-
-from app.database.base import Base
-from app.common.utils import generate_id
-
-
-class SessionTable(Base):
-    """
-    Session model for cookie-based authentication.
-
-    Stores active user sessions.
-    """
-    __tablename__ = "sessions"
-
-    # Session ID (stored in cookie)
-    id: Mapped[str] = mapped_column(
-        String(22),
-        primary_key=True,
-        default=lambda: generate_id(size=22)
-    )
-
-    # User reference
-    user_id: Mapped[str] = mapped_column(
-        String(22),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
-    )
-
-    # Session data (JSON string)
-    data: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True
-    )
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        server_default=func.now(),
-        nullable=False
-    )
-
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-        index=True  # Index for cleanup queries
-    )
-```
-
-### 9. `app/database/sessions/schemas.py` - Session Schemas
-
-```python
-"""
-Session Pydantic schemas.
-"""
-
-from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
-
-
-class SessionCreate(BaseModel):
-    """Schema for creating a session"""
-    user_id: str
-    expires_at: datetime
-    data: str | None = None
-
-
-class SessionRead(BaseModel):
-    """Schema for reading a session"""
-    id: str
-    user_id: str
-    data: str | None
-    created_at: datetime
-    expires_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-```
-
-### 10. `app/database/sessions/repository.py` - Session Repository
-
-```python
-"""
-Session repository using high-concurrency pattern.
-"""
-
-from datetime import datetime
-from sqlalchemy import select, delete
-from sqlalchemy.exc import SQLAlchemyError
-
-from app.database.db_config import async_session
-from app.database.sessions.models import SessionTable
-from app.database.sessions.schemas import SessionRead
-
-
-class SessionRepository:
-    """Repository for session database operations"""
-
-    @staticmethod
-    async def create(user_id: str, expires_at: datetime, data: str | None = None) -> SessionRead:
-        """Create a new session"""
-        try:
-            db_obj = SessionTable(
-                user_id=user_id,
-                expires_at=expires_at,
-                data=data
-            )
-
-            async with async_session() as session:
-                session.add(db_obj)
-                await session.commit()
-                await session.refresh(db_obj)
-                return SessionRead.model_validate(db_obj)
-
-        except SQLAlchemyError as e:
-            raise e
-
-    @staticmethod
-    async def get_by_id(session_id: str) -> SessionRead | None:
-        """Get session by ID"""
-        try:
-            async with async_session() as session:
-                stmt = select(SessionTable).where(SessionTable.id == session_id)
-                result = await session.execute(stmt)
-                db_obj = result.scalar_one_or_none()
-
-                if db_obj:
-                    return SessionRead.model_validate(db_obj)
-                return None
-
-        except SQLAlchemyError as e:
-            raise e
-
-    @staticmethod
-    async def delete_by_id(session_id: str) -> bool:
-        """Delete session by ID"""
-        try:
-            async with async_session() as session:
-                stmt = delete(SessionTable).where(SessionTable.id == session_id)
-                result = await session.execute(stmt)
-                await session.commit()
-                return result.rowcount > 0
-
-        except SQLAlchemyError as e:
-            raise e
-
-    @staticmethod
-    async def delete_expired() -> int:
-        """Delete all expired sessions (cleanup task)"""
-        try:
-            async with async_session() as session:
-                stmt = delete(SessionTable).where(
-                    SessionTable.expires_at < datetime.utcnow()
-                )
-                result = await session.execute(stmt)
-                await session.commit()
-                return result.rowcount
-
-        except SQLAlchemyError as e:
-            raise e
-```
-
-### 11. `app/database/__init__.py` - Import All Models
+### 8. `app/database/__init__.py` - Import All Models
 
 **CRITICAL**: Alembic needs all models imported to detect schema changes.
 
@@ -672,7 +495,6 @@ from app.database.base import Base  # noqa: F401
 
 # Import all models (order matters for foreign keys)
 from app.database.users.models import UserTable  # noqa: F401
-from app.database.sessions.models import SessionTable  # noqa: F401
 
 # Add future models here:
 # from app.database.api_keys.models import APIKeyTable  # noqa: F401
@@ -786,7 +608,6 @@ from app.database.base import Base
 # Import all models DIRECTLY (CRITICAL - ensures Alembic sees all tables)
 # Add new models here as they are created
 from app.database.users.models import UserTable  # noqa: F401
-from app.database.sessions.models import SessionTable  # noqa: F401
 # Future models:
 # from app.database.api_keys.models import APIKeyTable  # noqa: F401
 
@@ -884,9 +705,9 @@ else:
 cd backend_python
 
 # Create initial migration (autogenerate from models)
-alembic revision --autogenerate -m "Initial schema: users and sessions"
+alembic revision --autogenerate -m "Initial schema: users only"
 
-# This creates: migrations/versions/2025_XX_XX_XXXX-xxxxxxx_initial_schema_users_and_sessions.py
+# This creates: migrations/versions/2025_XX_XX_XXXX-xxxxxxx_initial_schema_users_only.py
 ```
 
 ### 5. Review and Apply Migration
@@ -910,7 +731,7 @@ alembic history
 
 ## Initial Schema Design
 
-The initial migration creates these tables:
+The initial migration creates the users table:
 
 ```sql
 -- users table
@@ -924,20 +745,9 @@ CREATE TABLE users (
 );
 
 CREATE INDEX ix_users_email ON users(email);
-
--- sessions table
-CREATE TABLE sessions (
-    id VARCHAR(22) PRIMARY KEY,
-    user_id VARCHAR(22) NOT NULL,
-    data TEXT,
-    created_at DATETIME DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
-    expires_at DATETIME NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX ix_sessions_user_id ON sessions(user_id);
-CREATE INDEX ix_sessions_expires_at ON sessions(expires_at);
 ```
+
+**Note**: Sessions are handled via encrypted cookies (starlette-securecookies + SessionMiddleware), not database tables. See Phase 3 for session/auth implementation.
 
 ---
 
@@ -995,19 +805,13 @@ Tests for database repositories.
 """
 
 import pytest
-from datetime import datetime, timedelta
 
 from app.database.users.repository import UserRepository
-from app.database.sessions.repository import SessionRepository
 
 
 @pytest.mark.asyncio
-async def test_create_user(test_db):
+async def test_create_user():
     """Test user creation"""
-    # Override global session with test session
-    import app.database.db_config as db_config
-    db_config.async_session = test_db
-
     # Test
     user = await UserRepository.create(
         email="test@example.com",
@@ -1020,78 +824,20 @@ async def test_create_user(test_db):
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_email(test_db):
+async def test_get_user_by_email():
     """Test getting user by email"""
-    import app.database.db_config as db_config
-    db_config.async_session = test_db
-
     # Create user
     await UserRepository.create(
-        email="test@example.com",
+        email="test2@example.com",
         password_hash="hashed_password"
     )
 
     # Get user
-    user = await UserRepository.get_by_email("test@example.com")
+    user = await UserRepository.get_by_email("test2@example.com")
 
     assert user is not None
-    assert user.email == "test@example.com"
+    assert user.email == "test2@example.com"
     assert user.password_hash == "hashed_password"
-
-
-@pytest.mark.asyncio
-async def test_create_session(test_db):
-    """Test session creation"""
-    import app.database.db_config as db_config
-    db_config.async_session = test_db
-
-    # Create user first
-    user = await UserRepository.create(
-        email="test@example.com",
-        password_hash="hashed_password"
-    )
-
-    # Create session
-    expires_at = datetime.utcnow() + timedelta(days=7)
-    session = await SessionRepository.create(
-        user_id=user.id,
-        expires_at=expires_at
-    )
-
-    assert session.user_id == user.id
-    assert session.id is not None
-
-
-@pytest.mark.asyncio
-async def test_delete_expired_sessions(test_db):
-    """Test cleaning up expired sessions"""
-    import app.database.db_config as db_config
-    db_config.async_session = test_db
-
-    # Create user
-    user = await UserRepository.create(
-        email="test@example.com",
-        password_hash="hashed_password"
-    )
-
-    # Create expired session
-    expired_time = datetime.utcnow() - timedelta(days=1)
-    await SessionRepository.create(
-        user_id=user.id,
-        expires_at=expired_time
-    )
-
-    # Create valid session
-    valid_time = datetime.utcnow() + timedelta(days=7)
-    await SessionRepository.create(
-        user_id=user.id,
-        expires_at=valid_time
-    )
-
-    # Delete expired
-    deleted_count = await SessionRepository.delete_expired()
-
-    assert deleted_count == 1
 ```
 
 Run tests:
@@ -1114,18 +860,16 @@ Phase 2 is complete when:
 - ✅ `async_session` configured with `expire_on_commit=False`
 - ✅ OpenTelemetry SQLAlchemy instrumentation enabled
 - ✅ User model (`UserTable`) created with modern Mapped[] syntax
-- ✅ Session model (`SessionTable`) created
-- ✅ Pydantic schemas for users and sessions
-- ✅ Repositories with static methods and high-concurrency pattern
+- ✅ Pydantic schemas for users
+- ✅ UserRepository with static methods and high-concurrency pattern
 - ✅ All models imported in `app/database/__init__.py`
 - ✅ Alembic initialized with async-compatible `env.py`
 - ✅ Initial migration generated
 - ✅ Migration applied successfully (`alembic upgrade head`)
 - ✅ `dbdata/junjo.db` file created
-- ✅ Database tables created (users, sessions)
-- ✅ Tests pass for user and session repositories
-- ✅ Can create users via repository
-- ✅ Can create sessions via repository
+- ✅ Database tables created (users only - sessions are cookie-based)
+- ✅ Tests pass for user repository
+- ✅ Can create and retrieve users via repository
 
 ---
 
