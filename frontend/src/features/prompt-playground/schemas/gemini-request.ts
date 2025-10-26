@@ -31,6 +31,7 @@ export const GeminiGenerationConfigSchema = z.object({
   maxOutputTokens: z.number().optional(),
   stopSequences: z.array(z.string()).optional(),
   responseMimeType: z.string().optional(),
+  response_json_schema: z.record(z.any()).optional(),
   thinkingConfig: GeminiThinkingConfigSchema.optional(),
 })
 

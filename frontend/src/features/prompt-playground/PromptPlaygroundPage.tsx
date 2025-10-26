@@ -12,14 +12,82 @@ import ProviderSelector from './components/ProviderSelector'
 import { Switch } from '../../components/catalyst/switch'
 import { getSpanDurationString } from '../../util/duration-utils'
 import CircularProgress from '../../components/CircularProgress'
-import { detectProviderWarnings, detectGeminiJsonSchema } from './utils/provider-warnings'
+import { detectProviderWarnings, detectGeminiJsonSchema, detectJsonSchema } from './utils/provider-warnings'
 import { mapOtelProviderToInternal } from './utils/provider-mapping'
+import { ensureOpenAISchemaCompatibility } from './utils/schema-utils'
 import ProviderWarningBanner from './components/ProviderWarningBanner'
 import ProviderWarningModal from './components/ProviderWarningModal'
 import JsonSchemaBanner from './components/JsonSchemaBanner'
 import JsonSchemaModal from './components/JsonSchemaModal'
 import GenerationSettingsModal from './components/GenerationSettingsModal'
 import ActiveSettingsDisplay from './components/ActiveSettingsDisplay'
+import { GenerationSettings } from './store/slice'
+
+// Helper function to parse generation settings from OpenInference telemetry
+function parseSettingsFromTelemetry(span: OtelSpan, targetProvider: string): GenerationSettings {
+  const invocationParams = span.attributes_json['llm.invocation_parameters']
+  if (!invocationParams) {
+    return {}
+  }
+
+  try {
+    // Parse the JSON string containing invocation parameters
+    const params = typeof invocationParams === 'string' ? JSON.parse(invocationParams) : invocationParams
+
+    // Determine the span's original provider
+    const otelProviderName = span.attributes_json['llm.provider']
+    const spanProvider = otelProviderName ? mapOtelProviderToInternal(otelProviderName) : null
+
+    const importedSettings: GenerationSettings = {}
+
+    // Always import common settings (temperature) regardless of provider
+    if (params.temperature !== undefined && params.temperature !== null) {
+      importedSettings.temperature = Number(params.temperature)
+    }
+
+    // Only import provider-specific settings if target provider matches span's provider
+    if (targetProvider === spanProvider) {
+      if (targetProvider === 'openai') {
+        if (params.reasoning_effort) {
+          importedSettings.reasoning_effort = params.reasoning_effort
+        }
+        if (params.max_completion_tokens !== undefined && params.max_completion_tokens !== null) {
+          importedSettings.max_completion_tokens = Number(params.max_completion_tokens)
+        }
+        if (params.max_tokens !== undefined && params.max_tokens !== null) {
+          importedSettings.max_tokens = Number(params.max_tokens)
+        }
+      } else if (targetProvider === 'anthropic') {
+        if (params.max_tokens !== undefined && params.max_tokens !== null) {
+          importedSettings.max_tokens = Number(params.max_tokens)
+        }
+        if (params.thinking) {
+          if (params.thinking.type === 'enabled') {
+            importedSettings.thinking_enabled = true
+          }
+          if (params.thinking.budget_tokens !== undefined && params.thinking.budget_tokens !== null) {
+            importedSettings.thinking_budget_tokens = Number(params.thinking.budget_tokens)
+          }
+        }
+      } else if (targetProvider === 'gemini') {
+        if (params.thinkingBudget !== undefined && params.thinkingBudget !== null) {
+          importedSettings.thinkingBudget = Number(params.thinkingBudget)
+        }
+        if (params.includeThoughts !== undefined && params.includeThoughts !== null) {
+          importedSettings.includeThoughts = Boolean(params.includeThoughts)
+        }
+        if (params.maxOutputTokens !== undefined && params.maxOutputTokens !== null) {
+          importedSettings.maxOutputTokens = Number(params.maxOutputTokens)
+        }
+      }
+    }
+
+    return importedSettings
+  } catch (error) {
+    console.error('Failed to parse llm.invocation_parameters:', error)
+    return {}
+  }
+}
 
 export default function PromptPlaygroundPage() {
   const { serviceName, traceId, spanId, workflowSpanId } = useParams<{
@@ -72,60 +140,9 @@ export default function PromptPlaygroundPage() {
       }
 
       // Import generation settings from OpenInference llm.invocation_parameters
-      const invocationParams = span.attributes_json['llm.invocation_parameters']
-      if (invocationParams) {
-        try {
-          // Parse the JSON string containing invocation parameters
-          const params = typeof invocationParams === 'string' ? JSON.parse(invocationParams) : invocationParams
-          const importedSettings: Record<string, unknown> = {}
-
-          // Common settings across all providers
-          if (params.temperature !== undefined && params.temperature !== null) {
-            importedSettings.temperature = Number(params.temperature)
-          }
-
-          // Provider-specific settings
-          if (internalProvider === 'openai') {
-            if (params.reasoning_effort) {
-              importedSettings.reasoning_effort = params.reasoning_effort
-            }
-            if (params.max_completion_tokens !== undefined && params.max_completion_tokens !== null) {
-              importedSettings.max_completion_tokens = Number(params.max_completion_tokens)
-            }
-            if (params.max_tokens !== undefined && params.max_tokens !== null) {
-              importedSettings.max_tokens = Number(params.max_tokens)
-            }
-          } else if (internalProvider === 'anthropic') {
-            if (params.max_tokens !== undefined && params.max_tokens !== null) {
-              importedSettings.max_tokens = Number(params.max_tokens)
-            }
-            if (params.thinking) {
-              if (params.thinking.type === 'enabled') {
-                importedSettings.thinking_enabled = true
-              }
-              if (params.thinking.budget_tokens !== undefined && params.thinking.budget_tokens !== null) {
-                importedSettings.thinking_budget_tokens = Number(params.thinking.budget_tokens)
-              }
-            }
-          } else if (internalProvider === 'gemini') {
-            if (params.thinkingBudget !== undefined && params.thinkingBudget !== null) {
-              importedSettings.thinkingBudget = Number(params.thinkingBudget)
-            }
-            if (params.includeThoughts !== undefined && params.includeThoughts !== null) {
-              importedSettings.includeThoughts = Boolean(params.includeThoughts)
-            }
-            if (params.maxOutputTokens !== undefined && params.maxOutputTokens !== null) {
-              importedSettings.maxOutputTokens = Number(params.maxOutputTokens)
-            }
-          }
-
-          // Only dispatch if we found any settings to import
-          if (Object.keys(importedSettings).length > 0) {
-            dispatch(PromptPlaygroundActions.setGenerationSettings(importedSettings))
-          }
-        } catch (error) {
-          console.error('Failed to parse llm.invocation_parameters:', error)
-        }
+      const importedSettings = parseSettingsFromTelemetry(span, internalProvider)
+      if (Object.keys(importedSettings).length > 0) {
+        dispatch(PromptPlaygroundActions.setGenerationSettings(importedSettings))
       }
     }
   }, [span, dispatch])
@@ -154,9 +171,17 @@ export default function PromptPlaygroundPage() {
     // Reset all settings to defaults when model/provider changes
     dispatch(PromptPlaygroundActions.resetGenerationSettings())
 
+    // Re-import settings from telemetry if available
+    if (span && selectedProvider) {
+      const importedSettings = parseSettingsFromTelemetry(span, selectedProvider)
+      if (Object.keys(importedSettings).length > 0) {
+        dispatch(PromptPlaygroundActions.setGenerationSettings(importedSettings))
+      }
+    }
+
     prevModelRef.current = selectedModel
     prevProviderRef.current = selectedProvider
-  }, [selectedModel, selectedProvider, dispatch])
+  }, [selectedModel, selectedProvider, dispatch, span])
 
   useEffect(() => {
     const fetchSpan = async () => {
@@ -254,7 +279,8 @@ export default function PromptPlaygroundPage() {
 
   // Compute provider warning and JSON schema info directly from span (no state needed)
   const providerWarning = detectProviderWarnings(span)
-  const jsonSchemaInfo = detectGeminiJsonSchema(span)
+  const jsonSchema = span ? detectJsonSchema(span) : null
+  const jsonSchemaInfo = jsonSchema ? { schema: jsonSchema } : null
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -262,6 +288,8 @@ export default function PromptPlaygroundPage() {
     setTestEndTime(null)
     const formData = new FormData(event.currentTarget)
     const prompt = formData.get('prompt') as string
+
+    // jsonSchema already extracted at component level (line 257)
 
     // Validate required fields
     if (!selectedModel) {
@@ -290,7 +318,22 @@ export default function PromptPlaygroundPage() {
         const result = await openaiRequest({
           model: selectedModel,
           messages: [{ role: 'user', content: prompt }],
-          ...(jsonMode && { response_format: { type: 'json_object' } }),
+          // Structured output with JSON schema (when schema available)
+          ...(jsonMode && jsonSchema && {
+            response_format: {
+              type: 'json_schema',
+              json_schema: {
+                name: 'structured_output',
+                strict: true,
+                // Ensure schema has additionalProperties: false at all levels for OpenAI strict mode
+                schema: ensureOpenAISchemaCompatibility(jsonSchema),
+              },
+            },
+          }),
+          // Schema-less JSON mode (when no schema available)
+          ...(jsonMode && !jsonSchema && {
+            response_format: { type: 'json_object' },
+          }),
           // Only send reasoning_effort for reasoning models
           ...(isReasoningModel &&
             generationSettings.reasoning_effort && { reasoning_effort: generationSettings.reasoning_effort }),
@@ -313,7 +356,21 @@ export default function PromptPlaygroundPage() {
           model: selectedModel,
           messages: [{ role: 'user', content: prompt }],
           max_tokens: generationSettings.max_tokens || 4096,
-          jsonMode,
+          // Structured output with JSON schema (when schema available)
+          ...(jsonMode && jsonSchema && {
+            tools: [
+              {
+                name: 'structured_output',
+                description: 'Return data in structured JSON format',
+                input_schema: jsonSchema,
+              },
+            ],
+            tool_choice: { type: 'tool', name: 'structured_output' },
+          }),
+          // Schema-less JSON mode (when no schema available)
+          ...(jsonMode && !jsonSchema && {
+            jsonMode: true,
+          }),
           ...(generationSettings.thinking_enabled &&
             generationSettings.thinking_budget_tokens && {
               thinking: {
@@ -341,7 +398,15 @@ export default function PromptPlaygroundPage() {
           model: selectedModel,
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            ...(jsonMode && { responseMimeType: 'application/json' }),
+            // Structured output with JSON schema (when schema available)
+            ...(jsonMode && jsonSchema && {
+              responseMimeType: 'application/json',
+              response_json_schema: jsonSchema,
+            }),
+            // Schema-less JSON mode (when no schema available)
+            ...(jsonMode && !jsonSchema && {
+              responseMimeType: 'application/json',
+            }),
             ...(generationSettings.temperature !== undefined && {
               temperature: generationSettings.temperature,
             }),
@@ -504,7 +569,7 @@ export default function PromptPlaygroundPage() {
                       onChange={(checked) => dispatch(PromptPlaygroundActions.setJsonMode(checked))}
                       className="group"
                     />
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">JSON Mode</span>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Structured Output</span>
                   </div>
                   <button
                     type="button"
@@ -536,7 +601,12 @@ export default function PromptPlaygroundPage() {
               </div>
             </div>
             <form onSubmit={handleSubmit}>
-              <ActiveSettingsDisplay settings={generationSettings} provider={selectedProvider} />
+              <ActiveSettingsDisplay
+                settings={generationSettings}
+                provider={selectedProvider}
+                jsonMode={jsonMode}
+                hasSchema={jsonSchema !== null}
+              />
               <div className="mb-4">
                 <label
                   htmlFor="prompt"
@@ -585,8 +655,8 @@ export default function PromptPlaygroundPage() {
 
               {jsonMode && !providerWarning && !jsonSchemaInfo && (
                 <div className={'text-xs text-zinc-500 mb-4'}>
-                  JSON Note: IF your original LLM request provided a typed schema / model with the request,
-                  these playground outputs will be missing that context, and results may be different.
+                  Note: No JSON schema detected from the original request. Using schema-less JSON mode.
+                  If the original request used a typed schema, results may differ.
                 </div>
               )}
 

@@ -119,6 +119,87 @@ response = client.models.generate_content(
   return null
 }
 
+// OpenAI-specific detector for JSON schema in response_format
+export function detectOpenAIJsonSchema(span: OtelSpan): JsonSchemaInfo | null {
+  const provider = span.attributes_json['llm.provider']
+
+  // Only run for OpenAI
+  if (provider !== 'openai') {
+    return null
+  }
+
+  // Check llm.invocation_parameters for response_format.json_schema
+  const invocationParams = span.attributes_json['llm.invocation_parameters']
+
+  let jsonSchema: Record<string, any> | null = null
+
+  if (typeof invocationParams === 'string') {
+    try {
+      const parsed = JSON.parse(invocationParams)
+      if (parsed.response_format?.json_schema?.schema) {
+        jsonSchema = parsed.response_format.json_schema.schema
+      }
+    } catch (e) {
+      // If parsing fails, schema not available
+      return null
+    }
+  } else if (typeof invocationParams === 'object' && invocationParams !== null) {
+    if (invocationParams.response_format?.json_schema?.schema) {
+      jsonSchema = invocationParams.response_format.json_schema.schema as Record<string, any>
+    }
+  }
+
+  if (jsonSchema) {
+    return { schema: jsonSchema }
+  }
+
+  return null
+}
+
+// Anthropic-specific detector for JSON schema in tool definitions
+export function detectAnthropicJsonSchema(span: OtelSpan): JsonSchemaInfo | null {
+  const provider = span.attributes_json['llm.provider']
+
+  // Only run for Anthropic
+  if (provider !== 'anthropic') {
+    return null
+  }
+
+  // Check llm.invocation_parameters for tools[].input_schema
+  const invocationParams = span.attributes_json['llm.invocation_parameters']
+
+  let jsonSchema: Record<string, any> | null = null
+
+  if (typeof invocationParams === 'string') {
+    try {
+      const parsed = JSON.parse(invocationParams)
+      if (parsed.tools && Array.isArray(parsed.tools) && parsed.tools.length > 0) {
+        // Get the first tool's input_schema
+        const firstTool = parsed.tools[0]
+        if (firstTool.input_schema) {
+          jsonSchema = firstTool.input_schema
+        }
+      }
+    } catch (e) {
+      // If parsing fails, schema not available
+      return null
+    }
+  } else if (typeof invocationParams === 'object' && invocationParams !== null) {
+    if (invocationParams.tools && Array.isArray(invocationParams.tools) && invocationParams.tools.length > 0) {
+      const firstTool = invocationParams.tools[0]
+      if (firstTool.input_schema) {
+        jsonSchema = firstTool.input_schema as Record<string, any>
+      }
+    }
+  }
+
+  if (jsonSchema) {
+    return { schema: jsonSchema }
+  }
+
+  return null
+}
+
 // Gemini-specific detector for response_json_schema
 export function detectGeminiJsonSchema(span: OtelSpan): JsonSchemaInfo | null {
   const provider = span.attributes_json['llm.provider']
@@ -136,6 +217,7 @@ export function detectGeminiJsonSchema(span: OtelSpan): JsonSchemaInfo | null {
   if (typeof invocationParams === 'string') {
     try {
       const parsed = JSON.parse(invocationParams)
+      // Check for response_json_schema (proper telemetry from genai SDK)
       if ('response_json_schema' in parsed && parsed.response_json_schema) {
         jsonSchema = parsed.response_json_schema
       }
@@ -144,6 +226,7 @@ export function detectGeminiJsonSchema(span: OtelSpan): JsonSchemaInfo | null {
       return null
     }
   } else if (typeof invocationParams === 'object' && invocationParams !== null) {
+    // Check for response_json_schema (proper telemetry from genai SDK)
     if ('response_json_schema' in invocationParams && invocationParams.response_json_schema) {
       jsonSchema = invocationParams.response_json_schema as Record<string, any>
     }
@@ -152,6 +235,21 @@ export function detectGeminiJsonSchema(span: OtelSpan): JsonSchemaInfo | null {
   if (jsonSchema) {
     return { schema: jsonSchema }
   }
+
+  return null
+}
+
+// Unified JSON schema detector - tries all providers
+export function detectJsonSchema(span: OtelSpan): Record<string, any> | null {
+  // Try provider-specific detectors
+  const openaiResult = detectOpenAIJsonSchema(span)
+  if (openaiResult) return openaiResult.schema
+
+  const anthropicResult = detectAnthropicJsonSchema(span)
+  if (anthropicResult) return anthropicResult.schema
+
+  const geminiResult = detectGeminiJsonSchema(span)
+  if (geminiResult) return geminiResult.schema
 
   return null
 }

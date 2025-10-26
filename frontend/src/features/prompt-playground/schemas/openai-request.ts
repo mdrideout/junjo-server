@@ -8,10 +8,24 @@ export const OpenAIMessageSchema = z.object({
 
 export type OpenAIMessage = z.infer<typeof OpenAIMessageSchema>
 
-// OpenAI Response Format Schema
-export const OpenAIResponseFormatSchema = z.object({
-  type: z.enum(['json_object', 'text']),
+// OpenAI JSON Schema Schema
+export const OpenAIJsonSchemaSchema = z.object({
+  name: z.string(),
+  strict: z.boolean().optional(),
+  schema: z.record(z.any()),
 })
+
+export type OpenAIJsonSchema = z.infer<typeof OpenAIJsonSchemaSchema>
+
+// OpenAI Response Format Schema
+export const OpenAIResponseFormatSchema = z.union([
+  z.object({ type: z.literal('json_object') }),
+  z.object({ type: z.literal('text') }),
+  z.object({
+    type: z.literal('json_schema'),
+    json_schema: OpenAIJsonSchemaSchema,
+  }),
+])
 
 export type OpenAIResponseFormat = z.infer<typeof OpenAIResponseFormatSchema>
 

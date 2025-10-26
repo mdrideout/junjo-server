@@ -39,8 +39,7 @@ type AnthropicRequest struct {
 	Tools              []AnthropicTool       `json:"tools,omitempty"`
 	ToolChoice         *AnthropicToolChoice  `json:"tool_choice,omitempty"`
 
-	// Extension for JSON mode (not part of Anthropic API)
-	// When true, will automatically configure tool calling for structured output
+	// Schema-less JSON mode fallback (when no schema available)
 	JSONMode bool `json:"jsonMode,omitempty"`
 }
 

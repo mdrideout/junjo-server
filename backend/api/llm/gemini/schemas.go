@@ -19,13 +19,14 @@ type GeminiThinkingConfig struct {
 
 // GeminiGenerationConfig represents the generation configuration
 type GeminiGenerationConfig struct {
-	Temperature      *float64              `json:"temperature,omitempty"`
-	TopP             *float64              `json:"topP,omitempty"`
-	TopK             *int                  `json:"topK,omitempty"`
-	MaxOutputTokens  *int                  `json:"maxOutputTokens,omitempty"`
-	StopSequences    []string              `json:"stopSequences,omitempty"`
-	ResponseMimeType string                `json:"responseMimeType,omitempty"`
-	ThinkingConfig   *GeminiThinkingConfig `json:"thinkingConfig,omitempty"`
+	Temperature         *float64               `json:"temperature,omitempty"`
+	TopP                *float64               `json:"topP,omitempty"`
+	TopK                *int                   `json:"topK,omitempty"`
+	MaxOutputTokens     *int                   `json:"maxOutputTokens,omitempty"`
+	StopSequences       []string               `json:"stopSequences,omitempty"`
+	ResponseMimeType    string                 `json:"responseMimeType,omitempty"`
+	ResponseJSONSchema  map[string]interface{} `json:"response_json_schema,omitempty"`
+	ThinkingConfig      *GeminiThinkingConfig  `json:"thinkingConfig,omitempty"`
 }
 
 // GeminiSystemInstruction represents system-level instructions

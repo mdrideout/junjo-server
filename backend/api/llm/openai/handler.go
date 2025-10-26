@@ -61,10 +61,27 @@ func HandleOpenAIGenerate(c echo.Context) error {
 		requestBody["stop"] = req.StopSequences
 	}
 
-	// Add response format for JSON mode
-	if req.ResponseFormat != nil && req.ResponseFormat.Type == "json_object" {
-		requestBody["response_format"] = map[string]string{
-			"type": "json_object",
+	// Add response format (structured outputs or schema-less JSON mode)
+	if req.ResponseFormat != nil {
+		if req.ResponseFormat.Type == "json_schema" && req.ResponseFormat.JSONSchema != nil {
+			// Structured output with JSON schema
+			requestBody["response_format"] = map[string]interface{}{
+				"type": "json_schema",
+				"json_schema": map[string]interface{}{
+					"name":   req.ResponseFormat.JSONSchema.Name,
+					"strict": req.ResponseFormat.JSONSchema.Strict,
+					"schema": req.ResponseFormat.JSONSchema.Schema,
+				},
+			}
+		} else if req.ResponseFormat.Type == "json_object" {
+			// Schema-less JSON mode
+			requestBody["response_format"] = map[string]string{
+				"type": "json_object",
+			}
+		} else if req.ResponseFormat.Type == "text" {
+			requestBody["response_format"] = map[string]string{
+				"type": "text",
+			}
 		}
 	}
 

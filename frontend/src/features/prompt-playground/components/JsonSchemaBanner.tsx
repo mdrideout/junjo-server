@@ -12,8 +12,10 @@ export default function JsonSchemaBanner({ onClick }: JsonSchemaBannerProps) {
     >
       <InformationCircleIcon className="size-4 flex-shrink-0 mt-0.5" />
       <div>
-        <div className="font-semibold">JSON Schema detected</div>
-        <div className="text-blue-700 dark:text-blue-300">Click to view the schema used in this request</div>
+        <div className="font-semibold">JSON Schema detected and active</div>
+        <div className="text-blue-700 dark:text-blue-300">
+          Playground requests will use this schema for structured output. Click to view schema details.
+        </div>
       </div>
     </button>
   )

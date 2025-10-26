@@ -6,9 +6,17 @@ type OpenAIMessage struct {
 	Content string `json:"content"`
 }
 
+// OpenAIJSONSchema represents a JSON schema for structured output
+type OpenAIJSONSchema struct {
+	Name   string                 `json:"name"`
+	Strict *bool                  `json:"strict,omitempty"`
+	Schema map[string]interface{} `json:"schema"`
+}
+
 // OpenAIResponseFormat specifies the response format for OpenAI
 type OpenAIResponseFormat struct {
-	Type string `json:"type"` // "json_object" or "text"
+	Type       string            `json:"type"` // "json_object", "text", or "json_schema"
+	JSONSchema *OpenAIJSONSchema `json:"json_schema,omitempty"`
 }
 
 // OpenAIRequest represents a request to OpenAI's chat completions API

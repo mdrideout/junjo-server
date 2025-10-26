@@ -70,7 +70,7 @@ func HandleAnthropicGenerate(c echo.Context) error {
 		}
 	}
 
-	// Handle JSON mode using tool calling (Anthropic's recommended approach)
+	// Handle schema-less JSON mode (when no schema available)
 	if req.JSONMode {
 		requestBody["tools"] = []map[string]interface{}{
 			{

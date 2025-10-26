@@ -3,11 +3,18 @@ import type { GenerationSettings } from '../store/slice'
 interface ActiveSettingsDisplayProps {
   settings: GenerationSettings
   provider: string | null
+  jsonMode?: boolean
+  hasSchema?: boolean
 }
 
-export default function ActiveSettingsDisplay({ settings, provider }: ActiveSettingsDisplayProps) {
+export default function ActiveSettingsDisplay({ settings, provider, jsonMode, hasSchema }: ActiveSettingsDisplayProps) {
   // Build list of active settings based on provider
   const activeSettings: string[] = []
+
+  // Add JSON schema indicator if structured output is enabled and schema is available
+  if (jsonMode && hasSchema) {
+    activeSettings.push('json_schema: active')
+  }
 
   if (provider === 'openai') {
     if (settings.reasoning_effort) {
