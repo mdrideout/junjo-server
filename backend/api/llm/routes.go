@@ -14,8 +14,7 @@ func RegisterRoutes(e *echo.Echo) {
 	e.POST("/llm/anthropic/generate", anthropic.HandleAnthropicGenerate)
 	e.POST("/llm/gemini/generate", gemini.HandleGeminiGenerate)
 
-	// Provider and model discovery endpoints
-	e.GET("/llm/providers", HandleGetProviders)
+	// Model discovery endpoints
 	e.GET("/llm/models", HandleGetModels)
 	e.GET("/llm/providers/:provider/models", HandleGetModelsByProvider)
 

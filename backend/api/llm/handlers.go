@@ -13,14 +13,6 @@ import (
 // Global cache instance (defined in provider/model_cache.go)
 var globalModelCache = provider.NewModelCache(15 * time.Minute)
 
-// HandleGetProviders returns a list of available LLM providers
-func HandleGetProviders(c echo.Context) error {
-	providers := []string{"openai", "anthropic", "gemini"}
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"providers": providers,
-	})
-}
-
 // HandleGetModels returns all available models across all providers
 func HandleGetModels(c echo.Context) error {
 	allModels := make([]provider.ModelInfo, 0)
