@@ -13,13 +13,15 @@ type OpenAIResponseFormat struct {
 
 // OpenAIRequest represents a request to OpenAI's chat completions API
 type OpenAIRequest struct {
-	Model          string                `json:"model"`
-	Messages       []OpenAIMessage       `json:"messages"`
-	Temperature    *float64              `json:"temperature,omitempty"`
-	MaxTokens      *int                  `json:"max_tokens,omitempty"`
-	TopP           *float64              `json:"top_p,omitempty"`
-	StopSequences  []string              `json:"stop,omitempty"`
-	ResponseFormat *OpenAIResponseFormat `json:"response_format,omitempty"`
+	Model               string                `json:"model"`
+	Messages            []OpenAIMessage       `json:"messages"`
+	Temperature         *float64              `json:"temperature,omitempty"`
+	MaxTokens           *int                  `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int                  `json:"max_completion_tokens,omitempty"`
+	ReasoningEffort     *string               `json:"reasoning_effort,omitempty"` // "minimal", "low", "medium", "high"
+	TopP                *float64              `json:"top_p,omitempty"`
+	StopSequences       []string              `json:"stop,omitempty"`
+	ResponseFormat      *OpenAIResponseFormat `json:"response_format,omitempty"`
 }
 
 // OpenAIChoice represents a choice in the OpenAI response

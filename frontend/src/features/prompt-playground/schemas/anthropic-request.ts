@@ -16,6 +16,14 @@ export const AnthropicToolChoiceSchema = z.object({
 
 export type AnthropicToolChoice = z.infer<typeof AnthropicToolChoiceSchema>
 
+// Anthropic Thinking Schema
+export const AnthropicThinkingSchema = z.object({
+  type: z.literal('enabled'),
+  budget_tokens: z.number().min(1024),
+})
+
+export type AnthropicThinking = z.infer<typeof AnthropicThinkingSchema>
+
 // Anthropic Tool Schema
 export const AnthropicToolSchema = z.object({
   name: z.string(),
@@ -33,7 +41,9 @@ export const AnthropicRequestSchema = z.object({
   max_tokens: z.number(),
   temperature: z.number().optional(),
   top_p: z.number().optional(),
+  top_k: z.number().optional(),
   stop_sequences: z.array(z.string()).optional(),
+  thinking: AnthropicThinkingSchema.optional(),
   tools: z.array(AnthropicToolSchema).optional(),
   tool_choice: AnthropicToolChoiceSchema.optional(),
   jsonMode: z.boolean().optional(), // Extension: auto-configures tool calling for JSON

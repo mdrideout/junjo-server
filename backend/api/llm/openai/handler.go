@@ -48,6 +48,12 @@ func HandleOpenAIGenerate(c echo.Context) error {
 	if req.MaxTokens != nil {
 		requestBody["max_tokens"] = *req.MaxTokens
 	}
+	if req.MaxCompletionTokens != nil {
+		requestBody["max_completion_tokens"] = *req.MaxCompletionTokens
+	}
+	if req.ReasoningEffort != nil {
+		requestBody["reasoning_effort"] = *req.ReasoningEffort
+	}
 	if req.TopP != nil {
 		requestBody["top_p"] = *req.TopP
 	}

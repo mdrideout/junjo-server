@@ -19,17 +19,25 @@ type AnthropicTool struct {
 	InputSchema map[string]interface{} `json:"input_schema"`
 }
 
+// AnthropicThinking represents the thinking configuration
+type AnthropicThinking struct {
+	Type         string `json:"type"` // "enabled"
+	BudgetTokens int    `json:"budget_tokens"` // >= 1024 and < max_tokens
+}
+
 // AnthropicRequest represents a request to Anthropic's Messages API
 type AnthropicRequest struct {
-	Model              string             `json:"model"`
-	Messages           []AnthropicMessage `json:"messages"`
-	System             string             `json:"system,omitempty"`
-	MaxTokens          int                `json:"max_tokens"`
-	Temperature        *float64           `json:"temperature,omitempty"`
-	TopP               *float64           `json:"top_p,omitempty"`
-	StopSequences      []string           `json:"stop_sequences,omitempty"`
-	Tools              []AnthropicTool    `json:"tools,omitempty"`
-	ToolChoice         *AnthropicToolChoice `json:"tool_choice,omitempty"`
+	Model              string                `json:"model"`
+	Messages           []AnthropicMessage    `json:"messages"`
+	System             string                `json:"system,omitempty"`
+	MaxTokens          int                   `json:"max_tokens"`
+	Temperature        *float64              `json:"temperature,omitempty"`
+	TopP               *float64              `json:"top_p,omitempty"`
+	TopK               *int                  `json:"top_k,omitempty"`
+	StopSequences      []string              `json:"stop_sequences,omitempty"`
+	Thinking           *AnthropicThinking    `json:"thinking,omitempty"`
+	Tools              []AnthropicTool       `json:"tools,omitempty"`
+	ToolChoice         *AnthropicToolChoice  `json:"tool_choice,omitempty"`
 
 	// Extension for JSON mode (not part of Anthropic API)
 	// When true, will automatically configure tool calling for structured output

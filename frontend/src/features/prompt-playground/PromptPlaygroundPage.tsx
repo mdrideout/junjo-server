@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { OtelSpan } from '../traces/schemas/schemas'
 import { API_HOST } from '../../config'
 import { useAppDispatch, useAppSelector } from '../../root-store/hooks'
@@ -18,6 +18,8 @@ import ProviderWarningBanner from './components/ProviderWarningBanner'
 import ProviderWarningModal from './components/ProviderWarningModal'
 import JsonSchemaBanner from './components/JsonSchemaBanner'
 import JsonSchemaModal from './components/JsonSchemaModal'
+import GenerationSettingsModal from './components/GenerationSettingsModal'
+import ActiveSettingsDisplay from './components/ActiveSettingsDisplay'
 
 export default function PromptPlaygroundPage() {
   const { serviceName, traceId, spanId } = useParams<{
@@ -34,6 +36,7 @@ export default function PromptPlaygroundPage() {
   const [testEndTime, setTestEndTime] = useState<string | null>(null)
   const [warningModalOpen, setWarningModalOpen] = useState(false)
   const [schemaModalOpen, setSchemaModalOpen] = useState(false)
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const dispatch = useAppDispatch()
   const {
     output,
@@ -43,6 +46,9 @@ export default function PromptPlaygroundPage() {
   const selectedModel = useAppSelector((state) => state.promptPlaygroundState.selectedModel)
   const selectedProvider = useAppSelector((state) => state.promptPlaygroundState.selectedProvider)
   const jsonMode = useAppSelector((state) => state.promptPlaygroundState.jsonMode)
+  const generationSettings = useAppSelector((state) => state.promptPlaygroundState.generationSettings)
+  const prevModelRef = useRef<string | null>(null)
+  const prevProviderRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (span) {
@@ -63,6 +69,63 @@ export default function PromptPlaygroundPage() {
       if (mimeType === 'application/json') {
         dispatch(PromptPlaygroundActions.setJsonMode(true))
       }
+
+      // Import generation settings from OpenInference llm.invocation_parameters
+      const invocationParams = span.attributes_json['llm.invocation_parameters']
+      if (invocationParams) {
+        try {
+          // Parse the JSON string containing invocation parameters
+          const params = typeof invocationParams === 'string' ? JSON.parse(invocationParams) : invocationParams
+          const importedSettings: Record<string, unknown> = {}
+
+          // Common settings across all providers
+          if (params.temperature !== undefined && params.temperature !== null) {
+            importedSettings.temperature = Number(params.temperature)
+          }
+
+          // Provider-specific settings
+          if (internalProvider === 'openai') {
+            if (params.reasoning_effort) {
+              importedSettings.reasoning_effort = params.reasoning_effort
+            }
+            if (params.max_completion_tokens !== undefined && params.max_completion_tokens !== null) {
+              importedSettings.max_completion_tokens = Number(params.max_completion_tokens)
+            }
+            if (params.max_tokens !== undefined && params.max_tokens !== null) {
+              importedSettings.max_tokens = Number(params.max_tokens)
+            }
+          } else if (internalProvider === 'anthropic') {
+            if (params.max_tokens !== undefined && params.max_tokens !== null) {
+              importedSettings.max_tokens = Number(params.max_tokens)
+            }
+            if (params.thinking) {
+              if (params.thinking.type === 'enabled') {
+                importedSettings.thinking_enabled = true
+              }
+              if (params.thinking.budget_tokens !== undefined && params.thinking.budget_tokens !== null) {
+                importedSettings.thinking_budget_tokens = Number(params.thinking.budget_tokens)
+              }
+            }
+          } else if (internalProvider === 'gemini') {
+            if (params.thinkingBudget !== undefined && params.thinkingBudget !== null) {
+              importedSettings.thinkingBudget = Number(params.thinkingBudget)
+            }
+            if (params.includeThoughts !== undefined && params.includeThoughts !== null) {
+              importedSettings.includeThoughts = Boolean(params.includeThoughts)
+            }
+            if (params.maxOutputTokens !== undefined && params.maxOutputTokens !== null) {
+              importedSettings.maxOutputTokens = Number(params.maxOutputTokens)
+            }
+          }
+
+          // Only dispatch if we found any settings to import
+          if (Object.keys(importedSettings).length > 0) {
+            dispatch(PromptPlaygroundActions.setGenerationSettings(importedSettings))
+          }
+        } catch (error) {
+          console.error('Failed to parse llm.invocation_parameters:', error)
+        }
+      }
     }
   }, [span, dispatch])
 
@@ -72,6 +135,27 @@ export default function PromptPlaygroundPage() {
       dispatch(PromptPlaygroundActions.setSelectedModel(null))
     }
   }, [selectedProvider, originalProvider, dispatch])
+
+  // Reset all settings when model or provider changes
+  useEffect(() => {
+    // Skip on initial mount
+    if (prevModelRef.current === null && prevProviderRef.current === null) {
+      prevModelRef.current = selectedModel
+      prevProviderRef.current = selectedProvider
+      return
+    }
+
+    // Only run if model or provider actually changed
+    if (prevModelRef.current === selectedModel && prevProviderRef.current === selectedProvider) {
+      return
+    }
+
+    // Reset all settings to defaults when model/provider changes
+    dispatch(PromptPlaygroundActions.resetGenerationSettings())
+
+    prevModelRef.current = selectedModel
+    prevProviderRef.current = selectedProvider
+  }, [selectedModel, selectedProvider, dispatch])
 
   useEffect(() => {
     const fetchSpan = async () => {
@@ -199,18 +283,46 @@ export default function PromptPlaygroundPage() {
 
       // Build provider-specific requests
       if (selectedProvider === 'openai') {
+        // Check if it's a reasoning model (o1, o3, o4, gpt-5 series)
+        const isReasoningModel = selectedModel ? /^(o1-|o3-|o4-|gpt-5)/.test(selectedModel) : false
+
         const result = await openaiRequest({
           model: selectedModel,
           messages: [{ role: 'user', content: prompt }],
           ...(jsonMode && { response_format: { type: 'json_object' } }),
+          // Only send reasoning_effort for reasoning models
+          ...(isReasoningModel &&
+            generationSettings.reasoning_effort && { reasoning_effort: generationSettings.reasoning_effort }),
+          ...(isReasoningModel &&
+            generationSettings.max_completion_tokens && {
+              max_completion_tokens: generationSettings.max_completion_tokens,
+            }),
+          // Only send temperature for non-reasoning models
+          ...(!isReasoningModel &&
+            generationSettings.temperature !== undefined && { temperature: generationSettings.temperature }),
+          // max_tokens for non-reasoning models
+          ...(!isReasoningModel &&
+            generationSettings.max_completion_tokens && {
+              max_tokens: generationSettings.max_completion_tokens,
+            }),
         })
         outputText = result.choices[0]?.message?.content || ''
       } else if (selectedProvider === 'anthropic') {
         const result = await anthropicRequest({
           model: selectedModel,
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 4096,
+          max_tokens: generationSettings.max_tokens || 4096,
           jsonMode,
+          ...(generationSettings.thinking_enabled &&
+            generationSettings.thinking_budget_tokens && {
+              thinking: {
+                type: 'enabled' as const,
+                budget_tokens: generationSettings.thinking_budget_tokens,
+              },
+            }),
+          ...(generationSettings.temperature !== undefined && {
+            temperature: generationSettings.temperature,
+          }),
         })
         // Extract output from response
         // If JSON mode, extract from tool use, otherwise from text
@@ -227,9 +339,26 @@ export default function PromptPlaygroundPage() {
         const result = await geminiRequest({
           model: selectedModel,
           contents: [{ parts: [{ text: prompt }] }],
-          ...(jsonMode && {
-            generationConfig: { responseMimeType: 'application/json' },
-          }),
+          generationConfig: {
+            ...(jsonMode && { responseMimeType: 'application/json' }),
+            ...(generationSettings.temperature !== undefined && {
+              temperature: generationSettings.temperature,
+            }),
+            ...(generationSettings.maxOutputTokens && {
+              maxOutputTokens: generationSettings.maxOutputTokens,
+            }),
+            ...((generationSettings.thinkingBudget !== undefined ||
+              generationSettings.includeThoughts !== undefined) && {
+              thinkingConfig: {
+                ...(generationSettings.thinkingBudget !== undefined && {
+                  thinkingBudget: generationSettings.thinkingBudget,
+                }),
+                ...(generationSettings.includeThoughts !== undefined && {
+                  includeThoughts: generationSettings.includeThoughts,
+                }),
+              },
+            }),
+          },
         })
         outputText = result.candidates[0]?.content?.parts[0]?.text || ''
       } else {
@@ -336,11 +465,14 @@ export default function PromptPlaygroundPage() {
           {/* Right Column: Playground */}
           <div className="w-1/2">
             <div className="flex justify-between items-center mb-4">
-              <div className="text-2xl font-bold dark:text-white">Test</div>
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
                 <div className="flex items-center gap-2">
                   <ProviderSelector originalProvider={originalProvider} />
-                  <ModelSelector originalModel={originalModel} originalProvider={originalProvider} provider={selectedProvider} />
+                  <ModelSelector
+                    originalModel={originalModel}
+                    originalProvider={originalProvider}
+                    provider={selectedProvider}
+                  />
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={jsonMode}
@@ -349,10 +481,37 @@ export default function PromptPlaygroundPage() {
                     />
                     <span className="text-sm text-zinc-500 dark:text-zinc-400">JSON Mode</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsModalOpen(true)}
+                    className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    title="Generation Settings"
+                  >
+                    <svg
+                      className="w-5 h-5 text-zinc-500 dark:text-zinc-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
             <form onSubmit={handleSubmit}>
+              <ActiveSettingsDisplay settings={generationSettings} provider={selectedProvider} />
               <div className="mb-4">
                 <label
                   htmlFor="prompt"
@@ -441,6 +600,15 @@ export default function PromptPlaygroundPage() {
           schemaInfo={jsonSchemaInfo}
         />
       )}
+
+      <GenerationSettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        provider={selectedProvider}
+        model={selectedModel}
+        settings={generationSettings}
+        onSave={(settings) => dispatch(PromptPlaygroundActions.setGenerationSettings(settings))}
+      />
     </div>
   )
 }

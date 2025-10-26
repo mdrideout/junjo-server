@@ -11,14 +11,21 @@ type GeminiContent struct {
 	Parts []GeminiPart `json:"parts"`
 }
 
+// GeminiThinkingConfig represents the thinking configuration
+type GeminiThinkingConfig struct {
+	ThinkingBudget  *int  `json:"thinkingBudget,omitempty"`  // -1 = dynamic, 0 = disabled, 1-32768 = specific budget
+	IncludeThoughts *bool `json:"includeThoughts,omitempty"` // Include thought summaries in response
+}
+
 // GeminiGenerationConfig represents the generation configuration
 type GeminiGenerationConfig struct {
-	Temperature      *float64 `json:"temperature,omitempty"`
-	TopP             *float64 `json:"topP,omitempty"`
-	TopK             *int     `json:"topK,omitempty"`
-	MaxOutputTokens  *int     `json:"maxOutputTokens,omitempty"`
-	StopSequences    []string `json:"stopSequences,omitempty"`
-	ResponseMimeType string   `json:"responseMimeType,omitempty"`
+	Temperature      *float64              `json:"temperature,omitempty"`
+	TopP             *float64              `json:"topP,omitempty"`
+	TopK             *int                  `json:"topK,omitempty"`
+	MaxOutputTokens  *int                  `json:"maxOutputTokens,omitempty"`
+	StopSequences    []string              `json:"stopSequences,omitempty"`
+	ResponseMimeType string                `json:"responseMimeType,omitempty"`
+	ThinkingConfig   *GeminiThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 
 // GeminiSystemInstruction represents system-level instructions
@@ -28,10 +35,10 @@ type GeminiSystemInstruction struct {
 
 // GeminiRequest represents a request to Gemini's GenerateContent API
 type GeminiRequest struct {
-	Model              string                   `json:"model,omitempty"`
-	Contents           []GeminiContent          `json:"contents"`
-	GenerationConfig   *GeminiGenerationConfig  `json:"generationConfig,omitempty"`
-	SystemInstruction  *GeminiSystemInstruction `json:"system_instruction,omitempty"`
+	Model             string                   `json:"model,omitempty"`
+	Contents          []GeminiContent          `json:"contents"`
+	GenerationConfig  *GeminiGenerationConfig  `json:"generationConfig,omitempty"`
+	SystemInstruction *GeminiSystemInstruction `json:"system_instruction,omitempty"`
 }
 
 // GeminiCandidate represents a response candidate

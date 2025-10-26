@@ -15,12 +15,19 @@ export const OpenAIResponseFormatSchema = z.object({
 
 export type OpenAIResponseFormat = z.infer<typeof OpenAIResponseFormatSchema>
 
+// OpenAI Reasoning Effort Schema
+export const OpenAIReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high'])
+
+export type OpenAIReasoningEffort = z.infer<typeof OpenAIReasoningEffortSchema>
+
 // OpenAI Request Schema
 export const OpenAIRequestSchema = z.object({
   model: z.string(),
   messages: z.array(OpenAIMessageSchema),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
+  max_completion_tokens: z.number().optional(),
+  reasoning_effort: OpenAIReasoningEffortSchema.optional(),
   top_p: z.number().optional(),
   stop: z.array(z.string()).optional(),
   response_format: OpenAIResponseFormatSchema.optional(),

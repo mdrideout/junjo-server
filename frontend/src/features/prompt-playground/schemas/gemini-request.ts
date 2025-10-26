@@ -15,6 +15,14 @@ export const GeminiContentSchema = z.object({
 
 export type GeminiContent = z.infer<typeof GeminiContentSchema>
 
+// Gemini Thinking Config Schema
+export const GeminiThinkingConfigSchema = z.object({
+  thinkingBudget: z.number().optional(), // -1 = dynamic, 0 = disabled, 1-32768 = specific budget
+  includeThoughts: z.boolean().optional(), // Include thought summaries in response
+})
+
+export type GeminiThinkingConfig = z.infer<typeof GeminiThinkingConfigSchema>
+
 // Gemini Generation Config Schema
 export const GeminiGenerationConfigSchema = z.object({
   temperature: z.number().optional(),
@@ -23,6 +31,7 @@ export const GeminiGenerationConfigSchema = z.object({
   maxOutputTokens: z.number().optional(),
   stopSequences: z.array(z.string()).optional(),
   responseMimeType: z.string().optional(),
+  thinkingConfig: GeminiThinkingConfigSchema.optional(),
 })
 
 export type GeminiGenerationConfig = z.infer<typeof GeminiGenerationConfigSchema>

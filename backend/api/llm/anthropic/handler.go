@@ -57,8 +57,17 @@ func HandleAnthropicGenerate(c echo.Context) error {
 	if req.TopP != nil {
 		requestBody["top_p"] = *req.TopP
 	}
+	if req.TopK != nil {
+		requestBody["top_k"] = *req.TopK
+	}
 	if len(req.StopSequences) > 0 {
 		requestBody["stop_sequences"] = req.StopSequences
+	}
+	if req.Thinking != nil {
+		requestBody["thinking"] = map[string]interface{}{
+			"type":          req.Thinking.Type,
+			"budget_tokens": req.Thinking.BudgetTokens,
+		}
 	}
 
 	// Handle JSON mode using tool calling (Anthropic's recommended approach)
