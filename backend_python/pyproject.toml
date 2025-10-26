@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "junjo-backend"
+version = "0.1.0"
+description = "Junjo Server Python Backend - LLM Observability Platform"
+requires-python = ">=3.14"
+dependencies = [
+    # Core Framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+
+    # Settings & Config (Pydantic v2+)
+    "pydantic[email]>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-dotenv>=1.0.0",
+
+    # Logging
+    "loguru>=0.7.0",
+
+    # CORS & Security
+    "python-multipart>=0.0.12",
+
+    # Database (SQLAlchemy 2.0 + async)
+    "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14.0",
+    "aiosqlite>=0.20.0",          # Async SQLite driver
+    "greenlet>=3.0.0",            # Required for SQLAlchemy async
+
+    # OpenTelemetry for SQLAlchemy
+    "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
+
+    # Utilities
+    "nanoid>=2.0.0",              # Short IDs (like wt_api_v2)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",           # For testing FastAPI
+    "ruff>=0.8.0",             # Linting
+    "mypy>=1.13.0",            # Type checking
+]
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Line too long
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

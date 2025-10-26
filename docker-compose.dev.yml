@@ -1,0 +1,76 @@
+services:
+  # Existing Go backend (keep running during migration)
+  junjo-server-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "1323:1323"
+    environment:
+      - SQLITE_DB_PATH=/dbdata/junjo.db
+      - DUCKDB_PATH=/dbdata/traces.duckdb
+      - INGESTION_SERVICE_INTERNAL_HOST=junjo-server-ingestion
+      - INGESTION_SERVICE_INTERNAL_PORT=50052
+    volumes:
+      - ./dbdata:/dbdata
+    depends_on:
+      - junjo-server-ingestion
+    networks:
+      - junjo-network
+
+  # NEW Python backend (adjacent for testing)
+  junjo-server-backend-python:
+    build:
+      context: ./backend_python
+      dockerfile: Dockerfile
+      target: dev  # Use dev stage for hot reload
+    ports:
+      - "1324:1324"  # Different port for parallel testing
+    environment:
+      - DEBUG=true
+      - APP_NAME=Junjo Server (Python)
+      - DB_SQLITE_PATH=/dbdata/junjo.db
+      - DB_DUCKDB_PATH=/dbdata/traces.duckdb
+      - INGESTION_HOST=junjo-server-ingestion
+      - INGESTION_PORT=50052
+      - CORS_ORIGINS=["http://localhost:5151"]
+    volumes:
+      - ./dbdata:/dbdata
+      - ./backend_python/app:/app/app  # Hot reload
+    depends_on:
+      - junjo-server-ingestion
+    networks:
+      - junjo-network
+
+  # Ingestion service (unchanged)
+  junjo-server-ingestion:
+    build:
+      context: ./ingestion-service
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"  # Public gRPC
+      - "50052:50052"  # Internal gRPC
+    environment:
+      - BADGERDB_PATH=/wal-data
+    volumes:
+      - ./wal-data:/wal-data
+    networks:
+      - junjo-network
+
+  # Frontend (unchanged - can test against either backend)
+  junjo-server-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5151:80"
+    environment:
+      # Point to Python backend for testing
+      - VITE_API_URL=http://localhost:1324
+    networks:
+      - junjo-network
+
+networks:
+  junjo-network:
+    driver: bridge
