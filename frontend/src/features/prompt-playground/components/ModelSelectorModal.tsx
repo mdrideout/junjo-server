@@ -7,7 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '../../../components/catalyst/dialog'
-import type { ModelInfo } from '../schemas/unified-request'
+import type { ModelInfo } from '../fetch/model-discovery'
 import {
   organizeModels,
   type ProductFamilyGroup,
@@ -67,6 +67,8 @@ export default function ModelSelectorModal({
       <DialogDescription>
         {provider === 'gemini'
           ? 'Choose a model from the available Gemini models. Filter by release type to narrow your selection.'
+          : provider === 'openai'
+          ? 'Choose a model from the available OpenAI models. Filter by release type to narrow your selection.'
           : `Choose a model from the available ${provider} models.`}
       </DialogDescription>
       <DialogBody>
@@ -77,8 +79,8 @@ export default function ModelSelectorModal({
           </div>
         )}
 
-        {/* Filter Controls and Refresh (only for Gemini) */}
-        {provider === 'gemini' && (
+        {/* Filter Controls and Refresh (for Gemini and OpenAI) */}
+        {(provider === 'gemini' || provider === 'openai') && (
           <div className="mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-700">
             <div className="flex items-center justify-between gap-4">
               <div className="flex gap-4">
@@ -100,23 +102,25 @@ export default function ModelSelectorModal({
                   />
                   <span className="text-sm text-zinc-700 dark:text-zinc-300">Preview</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeExp}
-                    onChange={(e) => setIncludeExp(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 border-zinc-300 rounded focus:ring-indigo-500"
-                  />
-                  <span className="text-sm text-zinc-700 dark:text-zinc-300">Experimental</span>
-                </label>
+                {provider === 'gemini' && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeExp}
+                      onChange={(e) => setIncludeExp(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-zinc-300 rounded focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Experimental</span>
+                  </label>
+                )}
               </div>
               <RefreshButton onClick={onRefresh} disabled={isRefreshing} isRefreshing={isRefreshing} />
             </div>
           </div>
         )}
 
-        {/* Refresh Button (for non-Gemini providers) */}
-        {provider && provider !== 'gemini' && (
+        {/* Refresh Button (for other providers without filters) */}
+        {provider && provider !== 'gemini' && provider !== 'openai' && (
           <div className="mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-700">
             <div className="flex justify-end">
               <RefreshButton onClick={onRefresh} disabled={isRefreshing} isRefreshing={isRefreshing} />
@@ -201,28 +205,33 @@ function ProductFamilySection({
 }: ProductFamilySectionProps) {
   return (
     <div>
-      {/* Product Family Header (Gemini/Gemma for gemini provider, Opus/Sonnet/Haiku for anthropic) */}
-      {(provider === 'gemini' || provider === 'anthropic') && (
+      {/* Product Family Header */}
+      {(provider === 'gemini' || provider === 'anthropic' || provider === 'openai') && (
         <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-3">
           {familyGroup.displayName}
         </h3>
       )}
 
-      {/* Version Groups */}
+      {/* Version/Variant Groups */}
       {familyGroup.versionGroups.map((versionGroup) => (
         <div key={versionGroup.version} className="mb-4 last:mb-0">
-          {/* Version Header */}
+          {/* Version Header (Gemini) or Variant Header (OpenAI) */}
           {provider === 'gemini' && versionGroup.version && (
             <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
               {versionGroup.version === '0.0' ? 'Latest' : `Version ${versionGroup.version}`}
+            </p>
+          )}
+          {provider === 'openai' && versionGroup.version && (
+            <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
+              {versionGroup.version.charAt(0).toUpperCase() + versionGroup.version.slice(1)}
             </p>
           )}
 
           {/* Release Type Groups */}
           {versionGroup.releaseTypeGroups.map((releaseTypeGroup) => (
             <div key={releaseTypeGroup.releaseType} className="mb-3 last:mb-0">
-              {/* Release Type Header */}
-              {provider === 'gemini' && (
+              {/* Release Type Header (only show if needed) */}
+              {(provider === 'gemini' || (provider === 'openai' && versionGroup.releaseTypeGroups.length > 1)) && (
                 <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-2 pl-2">
                   {releaseTypeGroup.displayName}
                 </p>

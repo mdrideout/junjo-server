@@ -2,8 +2,8 @@ import { useAppDispatch, useAppSelector } from '../../../root-store/hooks'
 import { PromptPlaygroundActions } from '../store/slice'
 import { useEffect, useState, useMemo } from 'react'
 import clsx from 'clsx'
-import { fetchModelsByProvider, refreshModelsByProvider } from '../fetch/unified-llm-request'
-import type { ModelInfo } from '../schemas/unified-request'
+import { fetchModelsByProvider, refreshModelsByProvider } from '../fetch/model-discovery'
+import type { ModelInfo } from '../fetch/model-discovery'
 import ModelSelectorModal from './ModelSelectorModal'
 
 interface ModelSelectorProps {

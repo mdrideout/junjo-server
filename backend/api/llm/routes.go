@@ -2,15 +2,17 @@ package llm
 
 import (
 	"github.com/labstack/echo/v4"
+	"junjo-server/api/llm/anthropic"
+	"junjo-server/api/llm/gemini"
+	"junjo-server/api/llm/openai"
 )
 
 // RegisterRoutes registers the LLM service routes.
 func RegisterRoutes(e *echo.Echo) {
-	// Legacy endpoint - maintained for backward compatibility
-	e.POST("/llm/generate", HandleGeminiTextRequest)
-
-	// New unified endpoint with multi-provider support
-	e.POST("/llm/v2/generate", HandleUnifiedLLMRequest)
+	// Provider-specific endpoints with native SDKs
+	e.POST("/llm/openai/generate", openai.HandleOpenAIGenerate)
+	e.POST("/llm/anthropic/generate", anthropic.HandleAnthropicGenerate)
+	e.POST("/llm/gemini/generate", gemini.HandleGeminiGenerate)
 
 	// Provider and model discovery endpoints
 	e.GET("/llm/providers", HandleGetProviders)

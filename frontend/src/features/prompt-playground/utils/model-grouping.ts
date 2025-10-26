@@ -1,4 +1,4 @@
-import type { ModelInfo } from '../schemas/unified-request'
+import type { ModelInfo } from '../fetch/model-discovery'
 
 export interface ParsedModelInfo {
   original: ModelInfo
@@ -70,6 +70,145 @@ export function parseAnthropicModel(model: ModelInfo): ParsedModelInfo {
   // Product family order: opus (highest tier) > sonnet > haiku
   const familyOrder = productFamily === 'opus' ? 0 : productFamily === 'sonnet' ? 1 : productFamily === 'haiku' ? 2 : 3
   const sortKey = `${version}-${familyOrder}`
+
+  return {
+    original: model,
+    productFamily,
+    version,
+    variant,
+    releaseType,
+    displayName,
+    sortKey,
+  }
+}
+
+/**
+ * Parse an OpenAI model name into its components
+ * Examples:
+ * - gpt-5-pro → { productFamily: "gpt-5", version: "5", variant: "pro", releaseType: "stable" }
+ * - gpt-4o-mini-2024-07-18 → { productFamily: "gpt-4o", version: "4o", variant: "mini", releaseType: "stable" }
+ * - gpt-4o-audio-preview → { productFamily: "gpt-4o", version: "4o", variant: "audio", releaseType: "preview" }
+ * - gpt-realtime-mini → { productFamily: "specialized", version: "0", variant: "realtime-mini", releaseType: "stable" }
+ */
+export function parseOpenAIModel(model: ModelInfo): ParsedModelInfo {
+  const id = model.id.toLowerCase()
+
+  // Determine release type
+  let releaseType: 'stable' | 'preview' | 'exp' = 'stable'
+  if (id.includes('-preview')) {
+    releaseType = 'preview'
+  }
+
+  // Extract product family and variant
+  let productFamily = 'unknown'
+  let version = '0'
+  let variant = 'standard'
+
+  // GPT-5 family
+  if (id.startsWith('gpt-5')) {
+    productFamily = 'gpt-5'
+    version = '5'
+
+    if (id.includes('-pro')) {
+      variant = 'pro'
+    } else if (id.includes('-mini')) {
+      variant = 'mini'
+    } else if (id.includes('-nano')) {
+      variant = 'nano'
+    } else if (id.includes('-search')) {
+      variant = 'search'
+    } else if (id.includes('-codex')) {
+      variant = 'codex'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // GPT-4o family
+  else if (id.startsWith('gpt-4o')) {
+    productFamily = 'gpt-4o'
+    version = '4o'
+
+    if (id.includes('-mini')) {
+      variant = 'mini'
+    } else if (id.includes('-audio')) {
+      variant = 'audio'
+    } else if (id.includes('-realtime')) {
+      variant = 'realtime'
+    } else if (id.includes('-search')) {
+      variant = 'search'
+    } else if (id.includes('-transcribe')) {
+      variant = 'transcribe'
+    } else if (id.includes('-tts')) {
+      variant = 'tts'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // GPT-4.1 family
+  else if (id.startsWith('gpt-4.1')) {
+    productFamily = 'gpt-4.1'
+    version = '4.1'
+
+    if (id.includes('-mini')) {
+      variant = 'mini'
+    } else if (id.includes('-nano')) {
+      variant = 'nano'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // GPT-4 family
+  else if (id.startsWith('gpt-4')) {
+    productFamily = 'gpt-4'
+    version = '4'
+
+    if (id.includes('-turbo')) {
+      variant = 'turbo'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // GPT-3.5 family
+  else if (id.startsWith('gpt-3.5')) {
+    productFamily = 'gpt-3.5'
+    version = '3.5'
+
+    if (id.includes('-turbo')) {
+      variant = 'turbo'
+    } else if (id.includes('-instruct')) {
+      variant = 'instruct'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // Specialized models (realtime, audio, image without version prefix)
+  else if (id.startsWith('gpt-realtime')) {
+    productFamily = 'specialized'
+    version = '0'
+    variant = 'realtime'
+  } else if (id.startsWith('gpt-audio')) {
+    productFamily = 'specialized'
+    version = '0'
+    variant = 'audio'
+  } else if (id.startsWith('gpt-image')) {
+    productFamily = 'specialized'
+    version = '0'
+    variant = 'image'
+  }
+
+  // Create display name
+  let displayName = variant.charAt(0).toUpperCase() + variant.slice(1)
+
+  // For "standard" variant, just show the model ID
+  if (variant === 'standard') {
+    displayName = model.id
+  }
+
+  // Create sort key: prioritize non-dated aliases, then sort by date descending
+  const hasDate = /\d{4}-\d{2}-\d{2}/.test(id)
+  const releaseTypeOrder = releaseType === 'stable' ? 0 : releaseType === 'preview' ? 1 : 2
+  const aliasOrder = hasDate ? 1 : 0 // Non-dated aliases come first
+  const sortKey = `${variant}-${aliasOrder}-${releaseTypeOrder}-${id}`
 
   return {
     original: model,
@@ -303,6 +442,132 @@ export function groupAnthropicModels(models: ModelInfo[]): ProductFamilyGroup[] 
 }
 
 /**
+ * Group OpenAI models by Product Family with variant subgroups
+ * Structure: GPT-5 > Pro/Standard/Mini/Nano/etc. > Stable/Preview
+ */
+export function groupOpenAIModels(models: ModelInfo[]): ProductFamilyGroup[] {
+  // Parse all models
+  const parsed = models.map(parseOpenAIModel)
+
+  // Group by product family
+  const familyMap = new Map<string, ParsedModelInfo[]>()
+  for (const model of parsed) {
+    if (!familyMap.has(model.productFamily)) {
+      familyMap.set(model.productFamily, [])
+    }
+    familyMap.get(model.productFamily)!.push(model)
+  }
+
+  // Build hierarchical structure
+  const result: ProductFamilyGroup[] = []
+  for (const [productFamily, familyModels] of familyMap) {
+    // Group by variant within this family
+    const variantMap = new Map<string, ParsedModelInfo[]>()
+    for (const model of familyModels) {
+      if (!variantMap.has(model.variant)) {
+        variantMap.set(model.variant, [])
+      }
+      variantMap.get(model.variant)!.push(model)
+    }
+
+    // Build variant groups with release type sub-groups
+    const versionGroups: VersionGroup[] = []
+    for (const [variant, variantModels] of variantMap) {
+      // Group by release type within this variant
+      const releaseTypeMap = new Map<'stable' | 'preview' | 'exp', ParsedModelInfo[]>()
+      for (const model of variantModels) {
+        if (!releaseTypeMap.has(model.releaseType)) {
+          releaseTypeMap.set(model.releaseType, [])
+        }
+        releaseTypeMap.get(model.releaseType)!.push(model)
+      }
+
+      // Sort models within each release type by sortKey
+      const releaseTypeGroups: ReleaseTypeGroup[] = []
+      for (const [releaseType, releaseTypeModels] of releaseTypeMap) {
+        releaseTypeModels.sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+
+        const displayName = releaseType === 'stable' ? 'Stable' :
+                           releaseType === 'preview' ? 'Preview' :
+                           'Experimental'
+
+        releaseTypeGroups.push({
+          releaseType,
+          displayName,
+          models: releaseTypeModels
+        })
+      }
+
+      // Sort release type groups: stable first, then preview, then exp
+      releaseTypeGroups.sort((a, b) => {
+        const order = { stable: 0, preview: 1, exp: 2 }
+        return order[a.releaseType] - order[b.releaseType]
+      })
+
+      // Use variant name as the "version" label in the hierarchy
+      versionGroups.push({
+        version: variant,
+        releaseTypeGroups
+      })
+    }
+
+    // Sort variant groups by priority
+    const variantOrder = {
+      'pro': 0,
+      'standard': 1,
+      'mini': 2,
+      'nano': 3,
+      'turbo': 4,
+      'instruct': 5,
+      'audio': 10,
+      'realtime': 11,
+      'search': 12,
+      'transcribe': 13,
+      'tts': 14,
+      'codex': 15,
+      'image': 16
+    }
+    versionGroups.sort((a, b) => {
+      const aOrder = variantOrder[a.version as keyof typeof variantOrder] ?? 99
+      const bOrder = variantOrder[b.version as keyof typeof variantOrder] ?? 99
+      return aOrder - bOrder
+    })
+
+    // Create display name for product family
+    let displayName = productFamily
+    if (productFamily === 'gpt-5') displayName = 'GPT-5'
+    else if (productFamily === 'gpt-4o') displayName = 'GPT-4o'
+    else if (productFamily === 'gpt-4.1') displayName = 'GPT-4.1'
+    else if (productFamily === 'gpt-4') displayName = 'GPT-4'
+    else if (productFamily === 'gpt-3.5') displayName = 'GPT-3.5'
+    else if (productFamily === 'specialized') displayName = 'Specialized'
+
+    result.push({
+      productFamily,
+      displayName,
+      versionGroups,
+    })
+  }
+
+  // Sort product families by explicit order: GPT-5, GPT-4.1, GPT-4o, GPT-4, GPT-3.5, specialized
+  const familyOrder = {
+    'gpt-5': 0,
+    'gpt-4.1': 1,
+    'gpt-4o': 2,
+    'gpt-4': 3,
+    'gpt-3.5': 4,
+    'specialized': 5
+  }
+  result.sort((a, b) => {
+    const aOrder = familyOrder[a.productFamily as keyof typeof familyOrder] ?? 99
+    const bOrder = familyOrder[b.productFamily as keyof typeof familyOrder] ?? 99
+    return aOrder - bOrder
+  })
+
+  return result
+}
+
+/**
  * Filter models by release type
  */
 export function filterModelsByReleaseType(
@@ -329,7 +594,7 @@ export function filterModelsByReleaseType(
 
 /**
  * Organize models into hierarchical groups for display
- * Handles Gemini, Anthropic (with complex grouping) and other providers (simple list)
+ * Handles Gemini, Anthropic, OpenAI (with complex grouping) and other providers (simple list)
  */
 export function organizeModels(
   models: ModelInfo[],
@@ -344,6 +609,11 @@ export function organizeModels(
   if (provider === 'anthropic') {
     const groups = groupAnthropicModels(models)
     // Anthropic models are all stable, but we still apply the filter for consistency
+    return filterModelsByReleaseType(groups, filters)
+  }
+
+  if (provider === 'openai') {
+    const groups = groupOpenAIModels(models)
     return filterModelsByReleaseType(groups, filters)
   }
 

@@ -12,8 +12,8 @@ require (
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/marcboeker/go-duckdb v1.8.5
 	github.com/matoous/go-nanoid/v2 v2.1.0
-	github.com/modfin/bellman v1.0.6
 	github.com/pressly/goose/v3 v3.25.0
+	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/proto/otlp v1.5.0
 	golang.org/x/crypto v0.43.0
 	google.golang.org/grpc v1.71.0
@@ -46,7 +46,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect

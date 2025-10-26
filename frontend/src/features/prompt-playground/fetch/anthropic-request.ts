@@ -1,9 +1,11 @@
 import { API_HOST } from '../../../config'
-import { GeminiTextRequest } from '../schemas/gemini-text-request'
-import { GeminiTextResponseSchema } from '../schemas/gemini-text-response'
+import { AnthropicRequest, AnthropicResponseSchema, type AnthropicResponse } from '../schemas/anthropic-request'
 
-export const geminiTextRequest = async (payload: GeminiTextRequest) => {
-  const response = await fetch(`${API_HOST}/llm/generate`, {
+/**
+ * Send a request to Anthropic's Messages API via our backend
+ */
+export const anthropicRequest = async (payload: AnthropicRequest): Promise<AnthropicResponse> => {
+  const response = await fetch(`${API_HOST}/llm/anthropic/generate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -27,5 +29,5 @@ export const geminiTextRequest = async (payload: GeminiTextRequest) => {
   }
 
   const data = await response.json()
-  return GeminiTextResponseSchema.parse(data)
+  return AnthropicResponseSchema.parse(data)
 }

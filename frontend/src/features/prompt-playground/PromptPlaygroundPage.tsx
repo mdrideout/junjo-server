@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import { OtelSpan } from '../traces/schemas/schemas'
 import { API_HOST } from '../../config'
 import { useAppDispatch, useAppSelector } from '../../root-store/hooks'
-import { unifiedLLMRequest } from './fetch/unified-llm-request'
+import { openaiRequest } from './fetch/openai-request'
+import { anthropicRequest } from './fetch/anthropic-request'
+import { geminiRequest } from './fetch/gemini-request'
 import { PromptPlaygroundActions } from './store/slice'
 import ModelSelector from './components/ModelSelector'
 import ProviderSelector from './components/ProviderSelector'
@@ -193,14 +195,48 @@ export default function PromptPlaygroundPage() {
       dispatch(PromptPlaygroundActions.setLoading(true))
       dispatch(PromptPlaygroundActions.setError(null))
 
-      const result = await unifiedLLMRequest({
-        provider: selectedProvider,
-        model: selectedModel,
-        prompt,
-        jsonMode,
-      })
+      let outputText = ''
 
-      dispatch(PromptPlaygroundActions.setOutput(result.text))
+      // Build provider-specific requests
+      if (selectedProvider === 'openai') {
+        const result = await openaiRequest({
+          model: selectedModel,
+          messages: [{ role: 'user', content: prompt }],
+          ...(jsonMode && { response_format: { type: 'json_object' } }),
+        })
+        outputText = result.choices[0]?.message?.content || ''
+      } else if (selectedProvider === 'anthropic') {
+        const result = await anthropicRequest({
+          model: selectedModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 4096,
+          jsonMode,
+        })
+        // Extract output from response
+        // If JSON mode, extract from tool use, otherwise from text
+        if (jsonMode && result.content.length > 0) {
+          const toolUseBlock = result.content.find((block) => block.type === 'tool_use')
+          if (toolUseBlock && toolUseBlock.input) {
+            outputText = JSON.stringify(toolUseBlock.input, null, 2)
+          }
+        } else {
+          const textBlock = result.content.find((block) => block.type === 'text')
+          outputText = textBlock?.text || ''
+        }
+      } else if (selectedProvider === 'gemini') {
+        const result = await geminiRequest({
+          model: selectedModel,
+          contents: [{ parts: [{ text: prompt }] }],
+          ...(jsonMode && {
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        })
+        outputText = result.candidates[0]?.content?.parts[0]?.text || ''
+      } else {
+        throw new Error(`Unknown provider: ${selectedProvider}`)
+      }
+
+      dispatch(PromptPlaygroundActions.setOutput(outputText))
       setTestEndTime(new Date().toISOString())
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error generating content'

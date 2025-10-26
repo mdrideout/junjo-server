@@ -71,6 +71,3 @@ func (mc *ModelCache) ClearProvider(provider ProviderType) {
 
 	delete(mc.cache, provider)
 }
-
-// Global cache instance with 15-minute TTL
-var globalModelCache = NewModelCache(15 * time.Minute)
