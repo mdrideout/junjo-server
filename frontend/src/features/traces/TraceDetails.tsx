@@ -98,7 +98,7 @@ export default function TraceDetails() {
             />
           </div>
           <div className="w-1/3 border-l border-zinc-300 dark:border-zinc-700 overflow-y-auto">
-            <SpanAttributesPanel span={selectedSpan} />
+            <SpanAttributesPanel span={selectedSpan} origin="traces" />
           </div>
         </div>
       </div>

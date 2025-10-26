@@ -22,10 +22,11 @@ import GenerationSettingsModal from './components/GenerationSettingsModal'
 import ActiveSettingsDisplay from './components/ActiveSettingsDisplay'
 
 export default function PromptPlaygroundPage() {
-  const { serviceName, traceId, spanId } = useParams<{
+  const { serviceName, traceId, spanId, workflowSpanId } = useParams<{
     serviceName: string
     traceId: string
     spanId: string
+    workflowSpanId?: string
   }>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -387,17 +388,41 @@ export default function PromptPlaygroundPage() {
             {serviceName}
           </Link>
           <div>&rarr;</div>
-          <Link to={`/traces/${serviceName}`} className={'hover:underline'}>
-            Traces
-          </Link>
-          <div>&rarr;</div>
-          <Link to={`/traces/${serviceName}/${traceId}`} className={'hover:underline'}>
-            {traceId}
-          </Link>
-          <div>&rarr;</div>
-          <Link to={`/traces/${serviceName}/${traceId}/${spanId}`} className={'hover:underline'}>
-            {spanId}
-          </Link>
+          {workflowSpanId ? (
+            <>
+              <Link to={`/logs/${serviceName}`} className={'hover:underline'}>
+                Workflow Executions
+              </Link>
+              <div>&rarr;</div>
+              <Link
+                to={`/workflows/${serviceName}/${traceId}/${workflowSpanId}`}
+                className={'hover:underline'}
+              >
+                {workflowSpanId}
+              </Link>
+              <div>&rarr;</div>
+              <Link
+                to={`/workflows/${serviceName}/${traceId}/${workflowSpanId}/${spanId}`}
+                className={'hover:underline'}
+              >
+                {spanId}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link to={`/traces/${serviceName}`} className={'hover:underline'}>
+                Traces
+              </Link>
+              <div>&rarr;</div>
+              <Link to={`/traces/${serviceName}/${traceId}`} className={'hover:underline'}>
+                {traceId}
+              </Link>
+              <div>&rarr;</div>
+              <Link to={`/traces/${serviceName}/${traceId}/${spanId}`} className={'hover:underline'}>
+                {spanId}
+              </Link>
+            </>
+          )}
           <div>&rarr;</div>
           <div>Prompt Playground</div>
         </div>
