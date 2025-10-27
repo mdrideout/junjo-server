@@ -44,3 +44,37 @@ class UserInDB(UserRead):
     """
 
     password_hash: str
+
+
+# Auth-specific schemas
+
+class SignInRequest(BaseModel):
+    """Schema for sign-in request."""
+
+    email: EmailStr
+    password: str
+
+
+class CreateUserRequest(BaseModel):
+    """Schema for user creation request (API endpoint)."""
+
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+
+
+class UserResponse(BaseModel):
+    """Response after successful user operation."""
+
+    message: str
+
+
+class DbHasUsersResponse(BaseModel):
+    """Response for db-has-users check."""
+
+    users_exist: bool
+
+
+class AuthTestResponse(BaseModel):
+    """Response for auth-test endpoint."""
+
+    user_email: EmailStr

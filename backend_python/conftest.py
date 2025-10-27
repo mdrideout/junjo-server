@@ -31,6 +31,10 @@ async def test_db():
     Yields:
         async_sessionmaker: Session factory for test database
     """
+    # Import models to register them with Base.metadata
+    # Done here to ensure fresh registration for each test
+    from app.database import models  # noqa: F401
+
     # Create temporary database file
     temp_dir = tempfile.mkdtemp()
     db_path = os.path.join(temp_dir, "test.db")
@@ -52,12 +56,15 @@ async def test_db():
     # Override global session with test session
     import app.database.db_config as db_config
     original_session = db_config.async_session
+    original_engine = db_config.engine
     db_config.async_session = async_session_test
+    db_config.engine = engine  # Also override engine for complete isolation
 
     yield async_session_test
 
-    # Restore original session
+    # Restore original session and engine
     db_config.async_session = original_session
+    db_config.engine = original_engine
 
     # Cleanup
     await engine.dispose()

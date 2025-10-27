@@ -29,11 +29,12 @@ services:
     environment:
       - DEBUG=true
       - APP_NAME=Junjo Server (Python)
-      - DB_SQLITE_PATH=/dbdata/sqlite/junjo.db
+      - DB_SQLITE_PATH=/dbdata/sqlite/junjo-python.db
       - DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
       - INGESTION_HOST=junjo-server-ingestion
       - INGESTION_PORT=50052
       - CORS_ORIGINS=["http://localhost:5151"]
+      - RUN_MIGRATIONS=true  # Auto-run migrations on startup
     volumes:
       - ./.dbdata:/dbdata  # Consolidated storage location
       - ./backend_python/app:/app/app  # Hot reload

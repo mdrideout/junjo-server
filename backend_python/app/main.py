@@ -14,10 +14,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from securecookies import SecureCookiesMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config.settings import settings
 from app.config.logger import setup_logging
 from app.common.responses import HealthResponse
+from app.features.auth import router as auth_router
 
 
 # Set up logging before anything else
@@ -50,10 +53,13 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down application")
-    # NOTE: In Phase 2, add database cleanup:
-    # from app.database.db_config import checkpoint_wal, engine
-    # await checkpoint_wal()  # Checkpoint SQLite WAL
-    # await engine.dispose()  # Close database connections
+    # Database cleanup (Phase 2 complete)
+    from app.database.db_config import checkpoint_wal, engine
+
+    await checkpoint_wal()  # Checkpoint SQLite WAL
+    logger.info("SQLite WAL checkpointed")
+    await engine.dispose()  # Close database connections
+    logger.info("Database connections closed")
 
 
 # Create FastAPI app
@@ -73,6 +79,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# === SESSION/AUTH MIDDLEWARE (ORDER IS CRITICAL!) ===
+
+# 1. Add ENCRYPTION middleware FIRST (outer layer)
+#    This encrypts/decrypts all cookies before they reach SessionMiddleware
+app.add_middleware(
+    SecureCookiesMiddleware,
+    secrets=[settings.session_cookie.secure_cookie_key],  # 32-byte encryption key
+)
+
+# 2. Add SESSION middleware SECOND (inner layer)
+#    This signs/validates session data
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_cookie.session_secret,  # Signing key
+    max_age=86400 * 30,  # 30 days (matches Go implementation)
+    https_only=True,  # HTTPS in production (HTTP in dev is OK)
+    same_site="strict",  # CSRF protection
+)
+
+# === REQUEST/RESPONSE FLOW ===
+# Incoming:  Browser → SecureCookiesMiddleware (decrypt) → SessionMiddleware (verify signature) → request.session populated
+# Outgoing:  request.session modified → SessionMiddleware (sign) → SecureCookiesMiddleware (encrypt) → Browser
+
+# === ROUTERS ===
+app.include_router(auth_router.router, tags=["auth"])
 
 
 # Health check endpoints

@@ -4,7 +4,7 @@ Each method creates its own session for complete isolation.
 See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 """
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import db_config
@@ -105,6 +105,90 @@ class UserRepository:
                 if db_obj:
                     return UserRead.model_validate(db_obj)
                 return None
+
+        except SQLAlchemyError as e:
+            raise e
+
+    @staticmethod
+    async def count_users() -> int:
+        """
+        Count total number of users.
+
+        Returns:
+            Total number of users in database
+
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            async with db_config.async_session() as session:
+                stmt = select(func.count()).select_from(UserTable)
+                result = await session.execute(stmt)
+                count = result.scalar_one()
+                return count
+
+        except SQLAlchemyError as e:
+            raise e
+
+    @staticmethod
+    async def db_has_users() -> bool:
+        """
+        Check if any users exist.
+
+        Returns:
+            True if users exist, False otherwise
+
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        count = await UserRepository.count_users()
+        return count > 0
+
+    @staticmethod
+    async def list_users() -> list[UserRead]:
+        """
+        List all users.
+
+        Returns:
+            List of all users (without password_hash)
+
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            async with db_config.async_session() as session:
+                stmt = select(UserTable)
+                result = await session.execute(stmt)
+                db_objs = result.scalars().all()
+
+                # Validate with Pydantic before session closes
+                return [UserRead.model_validate(obj) for obj in db_objs]
+
+        except SQLAlchemyError as e:
+            raise e
+
+    @staticmethod
+    async def delete_user(user_id: str) -> bool:
+        """
+        Delete a user by ID.
+
+        Args:
+            user_id: User ID to delete
+
+        Returns:
+            True if user was deleted, False if user not found
+
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            async with db_config.async_session() as session:
+                stmt = delete(UserTable).where(UserTable.id == user_id)
+                result = await session.execute(stmt)
+                await session.commit()
+
+                # Check if any rows were deleted
+                return result.rowcount > 0
 
         except SQLAlchemyError as e:
             raise e

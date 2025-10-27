@@ -1620,6 +1620,215 @@ describe('Schema Detection', () => {
 - Example: `components/FeatureCard.test.tsx`
 - May use Testing Library for DOM interactions
 
+## Backend (Python) Organization
+
+The Python backend is being built as a replacement for the Go backend, using FastAPI, SQLAlchemy, and modern Python idioms.
+
+### Feature Structure
+
+```
+backend_python/app/features/
+  feature-name/
+    router.py           # FastAPI route handlers
+    service.py          # Business logic
+    dependencies.py     # FastAPI dependencies (e.g., CurrentUser)
+    utils.py            # Feature-specific utilities
+    test_router.py      # Integration tests (co-located)
+    test_service.py     # Unit tests (co-located)
+    test_utils.py       # Utility tests (co-located)
+```
+
+### File Naming Conventions
+
+- **Package names**: Singular (e.g., `auth` not `auths`)
+- **File names**: Use snake_case (e.g., `router.py`, `test_router.py`)
+- **Test files**: Co-located with implementation using `test_` prefix (e.g., `test_router.py` next to `router.py`)
+
+### Layer Responsibilities
+
+#### router.py - FastAPI Route Handlers
+
+Handles HTTP requests and responses using FastAPI.
+
+**Responsibilities:**
+- Define route endpoints with decorators
+- Validate request data using Pydantic models
+- Use FastAPI dependencies for authentication, database sessions, etc.
+- Call service layer for business logic
+- Return Pydantic response models
+
+Example:
+```python
+from fastapi import APIRouter, Depends, HTTPException
+
+router = APIRouter()
+
+@router.post("/users", response_model=UserResponse)
+async def create_user(
+    request: CreateUserRequest,
+    current_user: str = Depends(get_current_user_email)
+):
+    try:
+        user = await AuthService.create_user(request.email, request.password)
+        return UserResponse(id=user.id, email=user.email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+```
+
+#### service.py - Business Logic
+
+Contains business logic and orchestration. Uses static methods and calls repository layer.
+
+**Responsibilities:**
+- Implement business rules and workflows
+- Coordinate between multiple repositories
+- Transform data between layers
+- Handle business-level errors
+
+#### dependencies.py - FastAPI Dependencies
+
+Defines reusable FastAPI dependencies (authentication, database sessions, etc.).
+
+Example:
+```python
+from typing import Annotated
+from fastapi import Depends, HTTPException, Request
+
+async def get_current_user_email(request: Request) -> str:
+    user_email = request.session.get("userEmail")
+    if user_email is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return user_email
+
+CurrentUserEmail = Annotated[str, Depends(get_current_user_email)]
+```
+
+### API Contract Migration Strategy
+
+When migrating APIs from Go to Python (or between any languages with different naming conventions):
+
+**Principle:** Use the backend's native convention in API responses.
+
+**Python Backend APIs:**
+- Use `snake_case` for JSON fields (Python convention)
+- Do NOT transform to camelCase to match JavaScript convention
+- Update frontend schemas to match backend convention
+
+**Rationale:**
+1. Backend code should follow its language's idioms
+2. Maintains consistency across all Python endpoints
+3. Avoids transformation layer complexity
+4. Frontend is more flexible (can handle both conventions)
+
+**Migration Pattern:**
+```python
+# ✅ Python backend - use snake_case
+class UserResponse(BaseModel):
+    user_id: str
+    created_at: datetime
+    is_active: bool
+```
+
+```typescript
+// ✅ Frontend - update schemas to match backend
+export const UserSchema = z.object({
+  user_id: z.string(),        // Match Python's snake_case
+  created_at: z.string(),
+  is_active: z.boolean(),
+})
+```
+
+**When migrating an endpoint:**
+1. Implement Python API with snake_case responses
+2. Update corresponding frontend schemas/types to match
+3. Test E2E to verify frontend compatibility
+4. Document any breaking changes
+
+**Avoid:**
+- ❌ Adding `alias` or transformation layers in Python (unnecessary complexity)
+- ❌ Mixing conventions within same API (some snake_case, some camelCase)
+- ❌ Assuming frontend "must have" camelCase (it's flexible)
+
+### Database Layer
+
+The database layer uses SQLAlchemy 2.0+ with async support and follows a repository pattern.
+
+**Structure:**
+- `backend_python/app/database/` - Centralized database configuration
+- `backend_python/app/database/{resource}/` - Per-resource repositories, models, schemas
+- `backend_python/alembic/` - Database migrations
+
+**Important:** See `backend_python/app/database/README.md` for critical details on:
+- High-concurrency async patterns
+- Test database isolation with autouse fixtures
+- Dynamic vs static session access patterns
+
+### Testing
+
+**Co-locate tests** with implementation using `test_` prefix:
+- `test_router.py` next to `router.py`
+- `test_service.py` next to `service.py`
+- `test_utils.py` next to `utils.py`
+
+**Test markers:**
+- `@pytest.mark.unit` - Fast, isolated unit tests
+- `@pytest.mark.integration` - Integration tests that use real database
+
+**Database isolation:**
+- Integration tests automatically get isolated temporary databases via autouse fixture
+- **No need to pass `test_db` parameter** to test functions (common mistake!)
+- The autouse fixture in `backend_python/conftest.py` handles setup/teardown automatically
+- **CRITICAL**: `conftest.py` must be at project root (`backend_python/conftest.py`), not in `tests/` directory, to work with co-located tests
+
+**Central model registration** (`app/database/models.py`):
+- All SQLAlchemy models must be imported in a central location
+- Both `conftest.py` and Alembic's `env.py` import from `app/database/models.py`
+- Ensures `Base.metadata.create_all()` knows about all tables
+- Add new models to this file as they're created
+
+**CRITICAL - Read the database README:**
+
+See `backend_python/app/database/README.md` for complete details on:
+- Why autouse fixtures eliminate the need for explicit `test_db` parameters
+- File-based vs in-memory test databases (and why file-based is required)
+- Dynamic session access pattern: `db_config.async_session()` not `from db_config import async_session`
+- High-concurrency async patterns with SQLAlchemy
+- Common pitfalls and how to avoid them
+
+Example:
+```python
+import pytest
+from httpx import ASGITransport, AsyncClient
+from app.main import app
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_create_user():
+    # No test_db parameter needed - autouse fixture handles it
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/users", json={"email": "test@example.com"})
+        assert response.status_code == 200
+```
+
+**Pytest configuration** in `pyproject.toml`:
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "app"]  # Discover co-located tests in app/
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (slower, uses real DB)",
+]
+```
+
+### Shared Code
+
+Shared code lives at the app level:
+- `backend_python/app/common/` - Shared utilities, responses, types
+- `backend_python/app/config/` - Configuration and settings
+- `backend_python/app/database/` - Database configuration and shared models
+
 ## Examples
 
 ### Example Backend Feature: API Keys
@@ -1665,9 +1874,18 @@ frontend/src/features/prompt-playground/
 - Flat feature packages with handler, service, repository layers
 - DTOs for API contracts; domain models only when necessary
 - Validate early (handler), authorize deep (repository)
-- Co-located tests
+- Co-located tests with `_test.go` suffix
 - Centralized DB schemas with sqlc
 - Shared code at root level
+
+**Backend (Python):**
+- Feature-based organization with router, service, dependencies layers
+- Pydantic models for validation and serialization
+- SQLAlchemy 2.0+ with async support and repository pattern
+- Co-located tests with `test_` prefix
+- Autouse fixtures for database isolation (see `backend_python/app/database/README.md`)
+- Pytest markers for unit vs integration tests
+- Shared code in `app/common/`, `app/config/`, `app/database/`
 
 **Frontend (React/TypeScript):**
 - Feature folders with flexible file/folder approach
@@ -1676,11 +1894,12 @@ frontend/src/features/prompt-playground/
 - Shared code in `common/`
 - Component props defined co-located with components
 
-**Both:**
+**All:**
 - Feature-based organization enables deleting features by deleting folders
 - Layered separation of concerns within features
 - Single responsibility principle throughout
 - Shared/common code for cross-feature concerns
+- Co-located tests with implementation
 
 ## When to Refactor: Triggers and Thresholds
 

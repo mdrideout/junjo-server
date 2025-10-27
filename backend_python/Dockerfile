@@ -5,6 +5,7 @@ FROM python:3.14-alpine AS base
 RUN apk add --no-cache \
     git \
     gcc \
+    g++ \
     musl-dev \
     libffi-dev
 
@@ -24,8 +25,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Stage 2: Production - Final image
 FROM python:3.14-alpine AS production
 
-# Install tini for proper signal handling
-RUN apk add --no-cache tini
+# Install tini for proper signal handling and libstdc++ for greenlet
+RUN apk add --no-cache tini libstdc++
 
 # Set working directory
 WORKDIR /app
@@ -41,6 +42,14 @@ ENV PYTHONPATH=/app
 COPY app ./app
 COPY .env.example ./.env.example
 
+# Copy Alembic configuration and migrations
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Create data directory
 RUN mkdir -p ./dbdata
 
@@ -51,8 +60,8 @@ EXPOSE 1324
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:1324/ping')"
 
-# Use tini as entrypoint for proper signal handling
-ENTRYPOINT ["/sbin/tini", "--"]
+# Use tini with entrypoint script for proper signal handling and migrations
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 
 # Run uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "1324"]
@@ -60,9 +69,8 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "1324"]
 # Stage 3: Development - Add dev dependencies and hot reload
 FROM production AS dev
 
-# Install development dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    /bin/uv pip install watchfiles
+# Install development dependencies using pip (uv not available in production stage)
+RUN pip install watchfiles
 
 # Override CMD for hot reload
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "1324", "--reload"]

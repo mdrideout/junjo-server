@@ -11,29 +11,27 @@ dependencies = [
     # Core Framework
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-
     # Settings & Config (Pydantic v2+)
     "pydantic[email]>=2.10.0",
     "pydantic-settings>=2.7.0",
     "python-dotenv>=1.0.0",
-
     # Logging
     "loguru>=0.7.0",
-
     # CORS & Security
     "python-multipart>=0.0.12",
-
     # Database (SQLAlchemy 2.0 + async)
     "sqlalchemy[asyncio]>=2.0.36",
     "alembic>=1.14.0",
-    "aiosqlite>=0.20.0",          # Async SQLite driver
-    "greenlet>=3.0.0",            # Required for SQLAlchemy async
-
+    "aiosqlite>=0.20.0", # Async SQLite driver
+    "greenlet>=3.0.0", # Required for SQLAlchemy async
     # OpenTelemetry for SQLAlchemy
     "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
-
     # Utilities
-    "nanoid>=2.0.0",              # Short IDs (like wt_api_v2)
+    "nanoid>=2.0.0", # Short IDs (like wt_api_v2)
+    "bcrypt>=5.0.0",
+    "starlette-securecookies>=1.1.1",
+    "itsdangerous>=2.2.0",
+    "asgi-csrf>=0.11",
 ]
 
 [project.optional-dependencies]
@@ -69,4 +67,8 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["tests"]
+testpaths = ["tests", "app"]
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (slower, uses real DB)",
+]

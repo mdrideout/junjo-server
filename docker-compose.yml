@@ -10,7 +10,7 @@ services:
       - ./.dbdata/sqlite:/dbdata/sqlite # SQLite storage
       - ./.dbdata/duckdb:/dbdata/duckdb # DuckDB storage
     ports:
-      - "1323:1323" # Public API server port for Junjo UX
+      - "1323:1323" # Public API server port for Junjo UX (Go - Legacy)
       - "50053:50053" # Internal gRPC server port
     networks:
       - junjo-network
@@ -22,6 +22,37 @@ services:
       timeout: 3s
       retries: 25
       start_period: 5s
+
+  junjo-server-backend-python:
+    container_name: junjo-server-backend-python
+    restart: unless-stopped
+    build:
+      context: ./backend_python
+      # No target specified - defaults to production stage
+    volumes:
+      - ./.dbdata/sqlite:/dbdata/sqlite # Shared volume for Python backend's own database
+      - ./.dbdata/duckdb:/dbdata/duckdb # Shared DuckDB (read-only for Python)
+    ports:
+      - "1324:1324" # Public API server port for Junjo UX (Python - Auth & New Features)
+    networks:
+      - junjo-network
+    env_file:
+      - .env
+    environment:
+      - DB_SQLITE_PATH=/dbdata/sqlite/junjo-python.db  # Separate database for Python backend
+      - DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
+      - INGESTION_HOST=junjo-server-ingestion
+      - INGESTION_PORT=50052
+      - RUN_MIGRATIONS=true  # Auto-run migrations on startup
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:1324/ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 25
+      start_period: 5s
+    depends_on:
+      junjo-server-ingestion:
+        condition: service_healthy
 
   junjo-server-ingestion:
     container_name: junjo-server-ingestion

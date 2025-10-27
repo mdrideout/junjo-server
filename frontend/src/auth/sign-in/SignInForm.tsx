@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AuthContext } from '../auth-context'
-import { API_HOST } from '../../config'
+import { getApiHost } from '../../config'
 
 export default function SignInForm() {
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +25,8 @@ export default function SignInForm() {
 
     // Perform sign in
     try {
-      const response = await fetch(`${API_HOST}/sign-in`, {
+      const endpoint = '/sign-in'
+      const response = await fetch(`${getApiHost(endpoint)}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -35,30 +36,19 @@ export default function SignInForm() {
       if (!response.ok) {
         const data = await response.json()
 
+        if (data.detail) {
+          throw new Error(data.detail)
+        }
         if (data.message) {
           throw new Error(data.message)
         }
         throw new Error('Sign-in failed')
       }
 
-      // Get CSRF Token
-      const csrfResponse = await fetch(`${API_HOST}/csrf`, {
-        method: 'GET',
-        credentials: 'include',
-      })
+      // Python backend uses SameSite cookies for CSRF protection
+      // No separate CSRF token needed
 
-      if (!csrfResponse.ok) {
-        const data = await csrfResponse.json()
-
-        if (data.message) {
-          throw new Error(data.message)
-        }
-        throw new Error('CSRF failed')
-      }
-
-      const data = await response.json()
-      const token = data.token
-      login(token)
+      login('') // Token not used with session-based auth
 
       navigate('/')
     } catch (err: any) {

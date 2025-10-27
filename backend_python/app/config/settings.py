@@ -54,6 +54,87 @@ class DatabaseSettings(BaseSettings):
     )
 
 
+class SessionCookieSettings(BaseSettings):
+    """Session cookie and authentication security settings"""
+
+    secure_cookie_key: Annotated[
+        str,
+        Field(
+            description="Base64-encoded 32-byte encryption key for SecureCookiesMiddleware (Fernet/AES-256). "
+                        "Generate with: openssl rand -base64 32"
+        )
+    ]
+    session_secret: Annotated[
+        str,
+        Field(
+            description="Signing secret for SessionMiddleware (any length). "
+                        "Generate with: openssl rand -base64 32"
+        )
+    ]
+    junjo_env: Annotated[
+        str,
+        Field(
+            default="development",
+            description="Environment (development/production)"
+        )
+    ]
+    junjo_prod_auth_domain: Annotated[
+        str,
+        Field(
+            default="",
+            description="Production auth domain for subdomain cookie support (e.g., 'junjo.io')"
+        )
+    ]
+
+    @field_validator("secure_cookie_key", mode="before")
+    @classmethod
+    def validate_secure_cookie_key(cls, v: str) -> str:
+        """
+        Validate secure cookie key is a valid base64 string for Fernet.
+
+        Fernet (used by SecureCookiesMiddleware) requires a base64url-encoded 32-byte key.
+        The `openssl rand -base64 32` command generates 32 random bytes and base64-encodes them.
+
+        Args:
+            v: Base64-encoded string (from `openssl rand -base64 32`)
+
+        Returns:
+            The same base64 string (Fernet will decode it internally)
+
+        Raises:
+            ValueError: If key is not valid base64 or not 32 bytes when decoded
+        """
+        if not isinstance(v, str):
+            raise TypeError(f"Expected str, got {type(v)}")
+
+        # Validate it's valid base64 and decodes to 32 bytes
+        import base64
+        try:
+            # Try standard base64 first (openssl rand -base64 uses standard, not urlsafe)
+            decoded = base64.b64decode(v)
+        except Exception as e:
+            raise ValueError(
+                f"JUNJO_SECURE_COOKIE_KEY must be a valid base64 string. "
+                f"Generate with: openssl rand -base64 32"
+            ) from e
+
+        # Validate exactly 32 bytes for AES-256
+        if len(decoded) != 32:
+            raise ValueError(
+                f"JUNJO_SECURE_COOKIE_KEY must decode to exactly 32 bytes for AES-256 encryption. "
+                f"Got {len(decoded)} bytes. Generate with: openssl rand -base64 32"
+            )
+
+        return v
+
+    model_config = SettingsConfigDict(
+        env_prefix="JUNJO_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
 class IngestionServiceSettings(BaseSettings):
     """Ingestion service gRPC connection settings"""
 
@@ -140,6 +221,13 @@ class AppSettings(BaseSettings):
         Field(
             default_factory=DatabaseSettings,
             description="Database settings"
+        )
+    ]
+    session_cookie: Annotated[
+        SessionCookieSettings,
+        Field(
+            default_factory=SessionCookieSettings,
+            description="Session cookie and authentication settings"
         )
     ]
     ingestion: Annotated[
