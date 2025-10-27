@@ -51,22 +51,22 @@ export default function ApiKeysPage() {
             <tbody>
               {apiKeys.map((apiKey) => {
                 // Make date human readable
-                const createdAt = new Date(apiKey.CreatedAt)
+                const createdAt = new Date(apiKey.created_at)
                 const createdAtString = createdAt.toLocaleString()
-                const truncatedKey = apiKey.Key.length > 12 ? apiKey.Key.slice(0, 12) + '...' : apiKey.Key
+                const truncatedKey = apiKey.key.length > 12 ? apiKey.key.slice(0, 12) + '...' : apiKey.key
 
                 return (
                   <tr
-                    key={apiKey.Key}
+                    key={apiKey.id}
                     className={'last-of-type:border-0 border-b border-zinc-200 dark:border-zinc-600'}
                   >
-                    <td className={'px-4 py-1.5'}>{apiKey.Name}</td>
+                    <td className={'px-4 py-1.5'}>{apiKey.name}</td>
                     <td className={'px-4 py-1.5 font-mono'}>{createdAtString}</td>
                     <td className={'px-4 py-1.5 font-mono'}>{truncatedKey}</td>
 
                     {/* Copy button */}
                     <td className={' text-center'}>
-                      <ApiKeyCopyButton apiKey={apiKey.Key} />
+                      <ApiKeyCopyButton apiKey={apiKey.key} />
                     </td>
 
                     {/* Delete button */}
@@ -74,8 +74,8 @@ export default function ApiKeysPage() {
                       <button
                         className={'p-1 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-md cursor-pointer'}
                         onClick={() => {
-                          if (confirm(`Are you sure you want to delete key ${apiKey.Name}?`)) {
-                            dispatch(ApiKeysStateActions.deleteApiKey({ key: apiKey.Key }))
+                          if (confirm(`Are you sure you want to delete key ${apiKey.name}?`)) {
+                            dispatch(ApiKeysStateActions.deleteApiKey({ id: apiKey.id }))
                           }
                         }}
                       >

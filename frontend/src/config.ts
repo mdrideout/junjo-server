@@ -21,7 +21,7 @@ export const BACKEND_HOSTS = {
   python: window.runtimeConfig?.PYTHON_API_HOST || 'http://localhost:1324',
 }
 
-// Auth endpoints use Python backend
+// Auth and API key endpoints use Python backend
 const AUTH_ENDPOINTS = [
   '/users/db-has-users',
   '/users/create-first-user',
@@ -29,6 +29,7 @@ const AUTH_ENDPOINTS = [
   '/sign-in',
   '/sign-out',
   '/auth-test',
+  '/api_keys',
 ]
 
 /**

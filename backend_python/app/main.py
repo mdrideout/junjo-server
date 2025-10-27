@@ -21,6 +21,7 @@ from app.config.settings import settings
 from app.config.logger import setup_logging
 from app.common.responses import HealthResponse
 from app.features.auth import router as auth_router
+from app.features.api_keys import router as api_keys_router
 
 
 # Set up logging before anything else
@@ -105,6 +106,7 @@ app.add_middleware(
 
 # === ROUTERS ===
 app.include_router(auth_router.router, tags=["auth"])
+app.include_router(api_keys_router.router)
 
 
 # Health check endpoints

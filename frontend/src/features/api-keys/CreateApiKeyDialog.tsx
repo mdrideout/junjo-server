@@ -10,7 +10,7 @@ import {
 import { useAppDispatch } from '../../root-store/hooks'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { ApiKeysStateActions } from './slice'
-import { API_HOST } from '../../config'
+import { getApiHost } from '../../config'
 
 export default function CreateApiKeyDialog() {
   const dispatch = useAppDispatch()
@@ -32,7 +32,8 @@ export default function CreateApiKeyDialog() {
 
     // Perform setup
     try {
-      const response = await fetch(`${API_HOST}/api_keys`, {
+      const apiHost = getApiHost('/api_keys')
+      const response = await fetch(`${apiHost}/api_keys`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
