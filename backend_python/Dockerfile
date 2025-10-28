@@ -15,8 +15,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # Set working directory
 WORKDIR /app
 
+# Copy shared proto files (needed for code generation)
+COPY proto/ ../proto/
+
 # Copy dependency files
-COPY pyproject.toml uv.lock* ./
+COPY backend_python/pyproject.toml backend_python/uv.lock* ./
 
 # Install dependencies into virtual environment
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -38,23 +41,40 @@ COPY --from=base /app/.venv ./.venv
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH=/app
 
+# Copy shared proto files and generate Python code
+COPY proto/ ../proto/
+RUN mkdir -p proto_gen && \
+    python -m grpc_tools.protoc \
+      -I../proto \
+      --python_out=./proto_gen \
+      --grpc_python_out=./proto_gen \
+      ../proto/*.proto && \
+    # Fix imports to use relative imports
+    for file in ./proto_gen/*_grpc.py; do \
+      if [ -f "$file" ]; then \
+        sed -i 's/^import \([a-z_]*\)_pb2 as/from . import \1_pb2 as/g' "$file"; \
+      fi; \
+    done && \
+    touch proto_gen/__init__.py
+
 # Copy application code
-COPY app ./app
-COPY .env.example ./.env.example
+COPY backend_python/app ./app
+COPY backend_python/.env.example ./.env.example
 
 # Copy Alembic configuration and migrations
-COPY alembic.ini ./alembic.ini
-COPY migrations ./migrations
+COPY backend_python/alembic.ini ./alembic.ini
+COPY backend_python/migrations ./migrations
 
 # Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
+COPY backend_python/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Create data directory
 RUN mkdir -p ./dbdata
 
-# Expose port
+# Expose ports
 EXPOSE 1324
+EXPOSE 50053
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

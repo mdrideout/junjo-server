@@ -110,6 +110,161 @@ sequenceDiagram
 6.  **Cache Update**: The ingestion service updates its cache with the validation result, including an expiration time.
 7.  **Access Control**: If the API key is valid (either from cache or backend), the request is allowed to proceed and the OTel data is written to the WAL. Otherwise, it is rejected with an `Unauthenticated` error.
 
+## 3.1. Python Backend Internal Authentication gRPC Service
+
+The Python backend (`backend_python`) now provides an **internal gRPC server** running concurrently with its FastAPI REST API. This gRPC service handles API key validation requests from the `ingestion-service`.
+
+### Architecture Overview
+
+The Python backend runs **two servers concurrently** in the same process:
+1. **FastAPI REST API** on port `1324` (public-facing)
+2. **gRPC server** on port `50053` (internal-only)
+
+Both servers share the same SQLite database connection pool and run asynchronously using Python's `asyncio`.
+
+### Concurrent Server Implementation
+
+**Key Files:**
+- `backend_python/app/main.py`: Orchestrates both servers using asyncio lifespan
+- `backend_python/app/grpc_server.py`: gRPC server lifecycle management
+- `backend_python/app/features/internal_auth/grpc_service.py`: InternalAuthService implementation
+- `backend_python/app/database/api_keys/repository.py`: API key database operations
+
+**Startup Flow:**
+```python
+# main.py - Lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start gRPC server as background task
+    grpc_task = asyncio.create_task(start_grpc_server_background())
+    yield
+    # Shutdown: Stop gRPC server gracefully
+    await stop_grpc_server()
+```
+
+**Port Configuration:**
+- Default gRPC port: `50053` (configured via `GRPC_PORT` environment variable)
+- **Security Note**: This port should ONLY be accessible on the internal Docker network in production
+- In docker-compose.yml, port 50053 is intentionally NOT exposed to the host
+
+### gRPC Service Implementation
+
+**Proto Definition:**
+The service uses the shared `proto/auth.proto` definition:
+
+```protobuf
+service InternalAuthService {
+  rpc ValidateApiKey(ValidateApiKeyRequest) returns (ValidateApiKeyResponse) {}
+}
+
+message ValidateApiKeyRequest {
+  string api_key = 1;
+}
+
+message ValidateApiKeyResponse {
+  bool is_valid = 1;
+}
+```
+
+**Handler Logic** (`app/features/internal_auth/grpc_service.py`):
+```python
+class InternalAuthServicer(auth_pb2_grpc.InternalAuthServiceServicer):
+    async def ValidateApiKey(
+        self,
+        request: auth_pb2.ValidateApiKeyRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> auth_pb2.ValidateApiKeyResponse:
+        api_key = request.api_key
+
+        # Query database for API key
+        result = await APIKeyRepository.get_by_key(api_key)
+
+        if result is None:
+            return auth_pb2.ValidateApiKeyResponse(is_valid=False)
+
+        return auth_pb2.ValidateApiKeyResponse(is_valid=True)
+```
+
+**Key Features:**
+- **Fail-closed security**: Returns `is_valid=False` on any error (database errors, exceptions)
+- **Async database access**: Uses SQLAlchemy async sessions with proper isolation
+- **No caching**: Unlike the Go implementation, caching is handled by the ingestion-service
+- **Structured logging**: Logs validation attempts with truncated key prefixes for security
+
+### Database Access Pattern
+
+The gRPC service uses the **high-concurrency async pattern** documented in `backend_python/app/database/README.md`:
+
+```python
+# Each validation creates its own database session
+async with db_config.async_session() as session:
+    stmt = select(APIKeyTable).where(APIKeyTable.key == key)
+    result = await session.execute(stmt)
+    db_obj = result.scalar_one_or_none()
+```
+
+This pattern ensures:
+- Complete isolation between concurrent requests
+- No session sharing between gRPC and FastAPI
+- Thread-safe operation under high concurrency
+
+### Integration with Ingestion Service
+
+The `ingestion-service` connects to the Python backend's gRPC service:
+
+**Docker Compose Configuration:**
+```yaml
+junjo-server-ingestion:
+  environment:
+    - BACKEND_GRPC_HOST=junjo-server-backend-python
+    - BACKEND_GRPC_PORT=50053
+  depends_on:
+    junjo-server-backend-python:
+      condition: service_healthy
+```
+
+**Connection Flow:**
+1. Ingestion service receives OTel data with `x-junjo-api-key` header
+2. API key interceptor checks local cache
+3. On cache miss, calls Python backend gRPC: `ValidateApiKey(api_key)`
+4. Python backend queries SQLite database
+5. Returns `is_valid` response
+6. Ingestion service updates cache with result
+
+### Testing
+
+**Unit Tests** (`app/features/internal_auth/test_grpc_service.py`):
+- Mock APIKeyRepository to test logic without database
+- Test valid keys, invalid keys, empty keys, database errors
+
+**Integration Tests** (`app/features/internal_auth/test_grpc_integration.py`):
+- Connect to real gRPC server on port 50053
+- Test with actual API keys from database
+- Verify server connectivity and response format
+
+**Concurrent Access Tests** (`app/features/internal_auth/test_concurrent_access.py`):
+- 50+ concurrent gRPC requests
+- Mixed FastAPI + gRPC traffic
+- Database isolation under load
+- Verify no race conditions
+
+### Migration Notes
+
+This Python gRPC implementation **replaces** the Go backend's internal auth service as part of the backend migration from Go to Python. Key differences:
+
+| Go Backend | Python Backend |
+|------------|----------------|
+| Port 50053 | Port 50053 (same) |
+| Separate gRPC server binary | Concurrent with FastAPI |
+| Uses Go's grpc library | Uses grpc.aio (Python async) |
+| Direct SQLite queries | SQLAlchemy async ORM |
+| Built-in caching | No caching (handled by client) |
+
+**Configuration:**
+- See `backend_python/.env.example` for `GRPC_PORT` configuration
+- See `docker-compose.yml` for security notes on port exposure
+- See `backend_python/app/database/README.md` for database patterns
+
 ## 4. Data Flow: WAL and Indexing
 
 The `ingestion-service` acts as a Write-Ahead Log (WAL) for the main `backend`. This decouples the high-throughput ingestion of OTel data from the more resource-intensive process of indexing that data for querying.

@@ -83,3 +83,7 @@ dmypy.json
 
 # Logs
 *.log
+
+# Generated Protocol Buffers
+proto_gen/
+**/proto_gen/

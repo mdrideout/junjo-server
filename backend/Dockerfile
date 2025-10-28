@@ -10,13 +10,16 @@ FROM golang:1.25-bookworm AS builder
 
 WORKDIR /app
 
-# 1. Optimize Docker's layer cache for Go modules.
+# 1. Copy shared proto files (needed for code generation)
+COPY proto/ ../proto/
+
+# 2. Optimize Docker's layer cache for Go modules.
 #    This step only re-runs if your dependencies change.
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-# 2. Copy the rest of your application's source code.
-COPY . .
+# 3. Copy the rest of your application's source code.
+COPY backend/ .
 
 # 3. Generate code before building.
 #    This ensures the build is self-contained and doesn't rely on
@@ -86,15 +89,18 @@ LABEL stage=development
 
 WORKDIR /app
 
+# Copy shared proto files
+COPY proto/ ../proto/
+
 # As before, cache module downloads.
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 # Install 'air' for hot-reloading.
 RUN go install github.com/air-verse/air@latest
 
 # Copy the source code for 'air' to watch.
-COPY . .
+COPY backend/ .
 
 # Expose ports needed for development.
 EXPOSE 1323

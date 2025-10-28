@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	pb "junjo-server/ingestion-service/proto_gen"
@@ -21,7 +22,19 @@ type AuthClient struct {
 // NewAuthClient creates a new gRPC client for the backend's auth service.
 // The connection will automatically reconnect if the backend becomes unavailable.
 func NewAuthClient() (*AuthClient, error) {
-	addr := "junjo-server-backend:50053"
+	// Read backend host and port from environment variables
+	// Defaults to old Go backend for backward compatibility
+	host := os.Getenv("BACKEND_GRPC_HOST")
+	if host == "" {
+		host = "junjo-server-backend" // Default to old Go backend
+	}
+
+	port := os.Getenv("BACKEND_GRPC_PORT")
+	if port == "" {
+		port = "50053" // Default port
+	}
+
+	addr := fmt.Sprintf("%s:%s", host, port)
 
 	// Create a persistent gRPC connection.
 	// gRPC automatically manages connection state and reconnects if the backend restarts.

@@ -50,11 +50,13 @@ db-regenerate:
 	@echo "✅ Workflow complete! Go code is now in sync with the new schema."
 
 # Proto generation target
+# Uses shared proto directory at repo root
 proto:
 	protoc \
+	-I../proto \
 	--go_out=./proto_gen \
 	--go-grpc_out=./proto_gen \
-	./proto/*.proto
+	../proto/*.proto
 
 sqlc-generate:
 	@echo ">> Generating sqlc code..."

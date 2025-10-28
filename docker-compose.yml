@@ -1,39 +1,51 @@
 services:
-  junjo-server-backend:
-    container_name: junjo-server-backend
-    restart: unless-stopped
-    build:
-      context: ./backend
-      target: ${JUNJO_BUILD_TARGET:-production} # Default to 'production', set to "development" for local air hot-reloading
-    volumes:
-      - ./backend:/app # Mount the backend code for hot reloading
-      - ./.dbdata/sqlite:/dbdata/sqlite # SQLite storage
-      - ./.dbdata/duckdb:/dbdata/duckdb # DuckDB storage
-    ports:
-      - "1323:1323" # Public API server port for Junjo UX (Go - Legacy)
-      - "50053:50053" # Internal gRPC server port
-    networks:
-      - junjo-network
-    env_file:
-      - .env
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1323/ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 25
-      start_period: 5s
+  # ============================================================================
+  # Go Backend - DISABLED (Migrating to Python Backend)
+  # ============================================================================
+  # The Go backend has been replaced by junjo-server-backend-python
+  # Uncomment below to re-enable for comparison/testing
+  # ============================================================================
+  # junjo-server-backend:
+  #   container_name: junjo-server-backend
+  #   restart: unless-stopped
+  #   build:
+  #     context: .
+  #     dockerfile: backend/Dockerfile
+  #     target: ${JUNJO_BUILD_TARGET:-production}
+  #   volumes:
+  #     - ./backend:/app
+  #     - ./.dbdata/sqlite:/dbdata/sqlite
+  #     - ./.dbdata/duckdb:/dbdata/duckdb
+  #   ports:
+  #     - "1323:1323" # Public API server port for Junjo UX (Go - Legacy)
+  #     - "50053:50053" # Internal gRPC server port (NOW USED BY PYTHON BACKEND)
+  #   networks:
+  #     - junjo-network
+  #   env_file:
+  #     - .env
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:1323/ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 25
+  #     start_period: 5s
 
   junjo-server-backend-python:
     container_name: junjo-server-backend-python
     restart: unless-stopped
     build:
-      context: ./backend_python
+      context: .
+      dockerfile: backend_python/Dockerfile
       # No target specified - defaults to production stage
     volumes:
       - ./.dbdata/sqlite:/dbdata/sqlite # Shared volume for Python backend's own database
       - ./.dbdata/duckdb:/dbdata/duckdb # Shared DuckDB (read-only for Python)
     ports:
       - "1324:1324" # Public API server port for Junjo UX (Python - Auth & New Features)
+      # SECURITY NOTE: Port 50053 is the internal gRPC server for API key validation
+      # This port should ONLY be accessible on the internal Docker network in production
+      # DO NOT expose this port in production docker-compose unless explicitly needed
+      # - "50053:50053" # Uncomment for local development/testing only
     networks:
       - junjo-network
     env_file:
@@ -50,15 +62,14 @@ services:
       timeout: 3s
       retries: 25
       start_period: 5s
-    depends_on:
-      junjo-server-ingestion:
-        condition: service_healthy
+    # No dependencies - Python backend starts first (provides gRPC auth service for ingestion)
 
   junjo-server-ingestion:
     container_name: junjo-server-ingestion
     restart: unless-stopped
     build:
-      context: ./ingestion-service
+      context: .
+      dockerfile: ingestion-service/Dockerfile
       target: ${JUNJO_BUILD_TARGET:-production}
     volumes:
       - ./ingestion-service:/app
@@ -70,9 +81,13 @@ services:
       - junjo-network
     env_file:
       - .env
+    environment:
+      # Backend Python gRPC service for API key validation
+      - BACKEND_GRPC_HOST=junjo-server-backend-python
+      - BACKEND_GRPC_PORT=50053
     depends_on:
-      junjo-server-backend:
-        condition: service_healthy # Wait for backend HTTP server to be healthy before starting
+      junjo-server-backend-python:
+        condition: service_healthy # Wait for Python backend gRPC server to be ready
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=localhost:50052"]
       interval: 5s
@@ -84,7 +99,8 @@ services:
     container_name: junjo-server-frontend
     restart: unless-stopped
     build:
-      context: ./frontend
+      context: .
+      dockerfile: frontend/Dockerfile
       target: ${JUNJO_BUILD_TARGET:-production} # Default to 'production', set to "development" for local air hot-reloading
     volumes:
       - frontend-modules:/app/node_modules # Dev only: Named volume for node_modules
@@ -97,8 +113,8 @@ services:
     env_file:
       - .env
     depends_on:
-      junjo-server-backend:
-        condition: service_healthy # Wait for junjo-server-backend to be healthy before starting junjo-server-frontend
+      junjo-server-backend-python:
+        condition: service_healthy # Wait for Python backend to be healthy before starting frontend
       junjo-server-ingestion:
         condition: service_healthy
 

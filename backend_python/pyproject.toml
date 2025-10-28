@@ -32,6 +32,10 @@ dependencies = [
     "starlette-securecookies>=1.1.1",
     "itsdangerous>=2.2.0",
     "asgi-csrf>=0.11",
+    # gRPC & Protocol Buffers
+    "grpcio>=1.68.0",         # gRPC runtime library
+    "grpcio-tools>=1.68.0",   # Protobuf compiler and code generator
+    "protobuf>=5.29.0",       # Protocol Buffers runtime
 ]
 
 [project.optional-dependencies]

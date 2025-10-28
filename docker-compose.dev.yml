@@ -1,24 +1,28 @@
 services:
-  # Existing Go backend (keep running during migration)
-  junjo-server-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "1323:1323"
-    environment:
-      - SQLITE_DB_PATH=/dbdata/sqlite/junjo.db
-      - DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
-      - INGESTION_SERVICE_INTERNAL_HOST=junjo-server-ingestion
-      - INGESTION_SERVICE_INTERNAL_PORT=50052
-    volumes:
-      - ./.dbdata:/dbdata  # Consolidated storage location
-    depends_on:
-      - junjo-server-ingestion
-    networks:
-      - junjo-network
+  # ============================================================================
+  # Go Backend - DISABLED (Migrating to Python Backend)
+  # ============================================================================
+  # Uncomment below to re-enable for comparison/testing
+  # ============================================================================
+  # junjo-server-backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "1323:1323"
+  #   environment:
+  #     - SQLITE_DB_PATH=/dbdata/sqlite/junjo.db
+  #     - DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
+  #     - INGESTION_SERVICE_INTERNAL_HOST=junjo-server-ingestion
+  #     - INGESTION_SERVICE_INTERNAL_PORT=50052
+  #   volumes:
+  #     - ./.dbdata:/dbdata
+  #   depends_on:
+  #     - junjo-server-ingestion
+  #   networks:
+  #     - junjo-network
 
-  # NEW Python backend (adjacent for testing)
+  # Python Backend (Primary)
   junjo-server-backend-python:
     build:
       context: ./backend_python
@@ -38,8 +42,7 @@ services:
     volumes:
       - ./.dbdata:/dbdata  # Consolidated storage location
       - ./backend_python/app:/app/app  # Hot reload
-    depends_on:
-      - junjo-server-ingestion
+    # No dependencies - Python backend starts first (provides gRPC auth service)
     networks:
       - junjo-network
 
@@ -53,8 +56,13 @@ services:
       - "50052:50052"  # Internal gRPC
     environment:
       - BADGERDB_PATH=/dbdata/badgerdb
+      # Backend Python gRPC service for API key validation
+      - BACKEND_GRPC_HOST=junjo-server-backend-python
+      - BACKEND_GRPC_PORT=50053
     volumes:
       - ./.dbdata/badgerdb:/dbdata/badgerdb  # Consolidated storage location
+    depends_on:
+      - junjo-server-backend-python
     networks:
       - junjo-network
 

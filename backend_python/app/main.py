@@ -6,10 +6,12 @@ Sets up the FastAPI app with:
 - Loguru logging
 - Health check endpoints
 - Feature routers (will be added in later phases)
+- gRPC server for internal authentication (runs concurrently)
 
 Pattern from wt_api_v2 (validated for production use).
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +24,7 @@ from app.config.logger import setup_logging
 from app.common.responses import HealthResponse
 from app.features.auth import router as auth_router
 from app.features.api_keys import router as api_keys_router
+from app.grpc_server import start_grpc_server_background, stop_grpc_server
 
 
 # Set up logging before anything else
@@ -33,7 +36,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager.
 
     Handles startup and shutdown events for the FastAPI application.
-    Logs startup configuration and performs cleanup on shutdown.
+    Logs startup configuration, starts gRPC server, and performs cleanup on shutdown.
 
     Args:
         app: FastAPI application instance.
@@ -46,15 +49,32 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.app_name}")
     logger.info(f"Python 3.14+ with Pydantic v2")
     logger.info(f"Debug mode: {settings.debug}")
-    logger.info(f"Server: {settings.host}:{settings.port}")
+    logger.info(f"FastAPI Server: {settings.host}:{settings.port}")
+    logger.info(f"gRPC Server: [::]:{settings.GRPC_PORT}")
     logger.info(f"CORS origins: {settings.cors_origins}")
     logger.info("=" * 60)
+
+    # Start gRPC server as background task
+    grpc_task = asyncio.create_task(start_grpc_server_background())
+    logger.info("gRPC server task created")
 
     yield
 
     # Shutdown
     logger.info("Shutting down application")
-    # Database cleanup (Phase 2 complete)
+
+    # Stop gRPC server first
+    await stop_grpc_server()
+
+    # Cancel gRPC task if still running
+    if not grpc_task.done():
+        grpc_task.cancel()
+        try:
+            await grpc_task
+        except asyncio.CancelledError:
+            logger.info("gRPC task cancelled")
+
+    # Database cleanup
     from app.database.db_config import checkpoint_wal, engine
 
     await checkpoint_wal()  # Checkpoint SQLite WAL

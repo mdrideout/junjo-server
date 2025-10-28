@@ -206,6 +206,17 @@ class AppSettings(BaseSettings):
         )
     ]
 
+    # gRPC Server
+    GRPC_PORT: Annotated[
+        int,
+        Field(
+            default=50053,
+            ge=1,
+            le=65535,
+            description="gRPC server port for internal authentication (50053)"
+        )
+    ]
+
     # CORS
     cors_origins: Annotated[
         list[str],
