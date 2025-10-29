@@ -12,6 +12,7 @@ Pattern from wt_api_v2 (validated for production use).
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -25,6 +26,7 @@ from app.config.logger import setup_logging
 from app.config.settings import settings
 from app.features.api_keys import router as api_keys_router
 from app.features.auth import router as auth_router
+from app.features.llm_playground import router as llm_playground_router
 from app.features.otel_spans import router as otel_spans_router
 from app.grpc_server import start_grpc_server_background, stop_grpc_server
 
@@ -54,6 +56,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"gRPC Server: [::]:{settings.GRPC_PORT}")
     logger.info(f"CORS origins: {settings.cors_origins}")
     logger.info("=" * 60)
+
+    # Configure LiteLLM environment variables
+    if settings.llm.openai_api_key:
+        os.environ["OPENAI_API_KEY"] = settings.llm.openai_api_key
+        logger.info("OpenAI API key configured")
+    if settings.llm.anthropic_api_key:
+        os.environ["ANTHROPIC_API_KEY"] = settings.llm.anthropic_api_key
+        logger.info("Anthropic API key configured")
+    if settings.llm.gemini_api_key:
+        os.environ["GEMINI_API_KEY"] = settings.llm.gemini_api_key
+        logger.info("Gemini API key configured")
 
     # Initialize DuckDB tables
     from app.db_duckdb.db_config import initialize_tables
@@ -146,6 +159,7 @@ app.add_middleware(
 # === ROUTERS ===
 app.include_router(auth_router.router, tags=["auth"])
 app.include_router(api_keys_router.router)
+app.include_router(llm_playground_router.router, prefix="/llm", tags=["llm"])
 app.include_router(
     otel_spans_router.router, prefix="/api/v1/observability", tags=["observability"]
 )

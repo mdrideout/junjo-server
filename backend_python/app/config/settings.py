@@ -236,6 +236,39 @@ class SpanIngestionSettings(BaseSettings):
     )
 
 
+class LLMSettings(BaseSettings):
+    """LLM provider API key configuration for LiteLLM"""
+
+    openai_api_key: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="OpenAI API key (starts with sk-)"
+        )
+    ]
+    anthropic_api_key: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Anthropic API key (starts with sk-ant-)"
+        )
+    ]
+    gemini_api_key: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Google AI Studio API key for Gemini models"
+        )
+    ]
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+
 class AppSettings(BaseSettings):
     """Main application settings"""
 
@@ -320,6 +353,13 @@ class AppSettings(BaseSettings):
         Field(
             default_factory=SpanIngestionSettings,
             description="Span ingestion poller settings"
+        )
+    ]
+    llm: Annotated[
+        LLMSettings,
+        Field(
+            default_factory=LLMSettings,
+            description="LLM provider API keys for LiteLLM"
         )
     ]
 
