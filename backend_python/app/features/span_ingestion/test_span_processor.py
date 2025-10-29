@@ -6,23 +6,23 @@ Tests the complete span processing pipeline:
 3. Verify correct insertion into DuckDB (spans + state patches)
 """
 
-import pytest
-from datetime import datetime, timezone
-from opentelemetry.proto.trace.v1 import trace_pb2
-from opentelemetry.proto.common.v1 import common_pb2
+from datetime import UTC
 
+import pytest
+from opentelemetry.proto.common.v1 import common_pb2
+from opentelemetry.proto.trace.v1 import trace_pb2
+
+from app.db_duckdb.db_config import get_connection
 from app.features.span_ingestion.span_processor import (
-    convert_kind,
-    convert_otlp_timestamp,
-    extract_string_attribute,
-    extract_json_attribute,
     convert_attributes_to_json,
     convert_events_to_json,
+    convert_kind,
+    convert_otlp_timestamp,
+    extract_json_attribute,
+    extract_string_attribute,
     filter_junjo_attributes,
     process_span_batch,
-    JUNJO_FILTERED_ATTRIBUTES,
 )
-from app.db_duckdb.db_config import get_connection
 
 
 class TestOTLPTypeConversions:
@@ -47,7 +47,7 @@ class TestOTLPTypeConversions:
         assert dt.year == 2023
         assert dt.month == 11
         assert dt.day == 13
-        assert dt.tzinfo == timezone.utc
+        assert dt.tzinfo == UTC
 
         # Precision: should maintain microseconds but lose nanoseconds
         # Note: Floating point division may cause rounding (123456789 ns → 123456 or 123457 μs)

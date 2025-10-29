@@ -7,7 +7,6 @@ to validate API keys with caching support.
 
 import grpc
 from loguru import logger
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.db_sqlite.api_keys.repository import APIKeyRepository
 from proto_gen import auth_pb2, auth_pb2_grpc
@@ -21,7 +20,7 @@ class InternalAuthServicer(auth_pb2_grpc.InternalAuthServiceServicer):
     It queries the database to check if a key exists and is valid.
     """
 
-    async def ValidateApiKey(
+    async def ValidateApiKey(  # noqa: N802 - gRPC method names follow protobuf convention
         self,
         request: auth_pb2.ValidateApiKeyRequest,
         context: grpc.aio.ServicerContext,

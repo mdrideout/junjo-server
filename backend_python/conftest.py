@@ -2,24 +2,21 @@
 
 Provides test database setup with temporary SQLite files.
 
-IMPORTANT: Environment variables are set BEFORE any app imports to ensure
-the production db_config.py (which creates engine at import time) points
-to a test location instead of the real production database.
+IMPORTANT: Environment variables must be set BEFORE importing app code.
+The env var setup happens at module level, and app imports are deferred to
+inside fixtures to ensure correct initialization order.
 """
 
 import os
 import tempfile
 
-# Set test database path BEFORE importing app code
-# This ensures production db_config.py creates engine pointing to test location
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+# Set test database path BEFORE any app code gets imported
+# This ensures db_config.py (which creates engine at import time) uses test location
 _test_base_dir = tempfile.mkdtemp(prefix="junjo_test_")
 os.environ["DB_SQLITE_PATH"] = f"{_test_base_dir}/production_stub.db"
-
-# NOW safe to import app code (db_config will use test path)
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-
-from app.db_sqlite.base import Base
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -31,9 +28,9 @@ async def test_db():
     Yields:
         async_sessionmaker: Session factory for test database
     """
-    # Import models to register them with Base.metadata
-    # Done here to ensure fresh registration for each test
+    # Import app code here (after env vars are set at module level)
     from app.db_sqlite import models  # noqa: F401
+    from app.db_sqlite.base import Base
 
     # Create temporary database file
     temp_dir = tempfile.mkdtemp()

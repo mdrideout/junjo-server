@@ -4,12 +4,13 @@ Uses modern SQLAlchemy 2.0 syntax with Mapped[] type hints.
 """
 
 from datetime import datetime
-from sqlalchemy import String, DateTime, Boolean
+
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from app.db_sqlite.base import Base
 from app.common.utils import generate_id
+from app.db_sqlite.base import Base
 
 
 class UserTable(Base):

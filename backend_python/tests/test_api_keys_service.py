@@ -1,7 +1,8 @@
 """Tests for API key service."""
 
-import pytest
 import re
+
+import pytest
 
 from app.features.api_keys.service import APIKeyService
 

@@ -4,7 +4,6 @@ Authentication router.
 Implements all authentication endpoints, mirroring the Go implementation.
 """
 
-from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Request, status
 from loguru import logger

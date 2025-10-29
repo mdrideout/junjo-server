@@ -11,11 +11,10 @@ SQLite-specific:
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # Import settings to get database URL
 from app.config.settings import settings
@@ -26,6 +25,7 @@ from app.db_sqlite.base import Base
 # Import all models DIRECTLY (CRITICAL - ensures Alembic sees all tables)
 # Add new models here as they are created
 from app.db_sqlite.users.models import UserTable  # noqa: F401
+
 # Future models:
 # from app.database.api_keys.models import APIKeyTable  # noqa: F401
 

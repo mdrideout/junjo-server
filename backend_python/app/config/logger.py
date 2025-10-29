@@ -8,6 +8,7 @@ Pattern from wt_api_v2 (validated for production use).
 """
 
 import sys
+
 from loguru import logger
 
 from app.config.settings import settings

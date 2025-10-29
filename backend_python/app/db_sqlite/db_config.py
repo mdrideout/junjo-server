@@ -71,7 +71,6 @@ SQLAlchemyInstrumentor().instrument(
 from app.db_sqlite import models  # noqa: F401, E402
 
 
-
 # Dependency to get DB session
 async def get_db():
     """FastAPI dependency to get database session.

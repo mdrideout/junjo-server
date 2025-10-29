@@ -4,7 +4,6 @@ Authentication service layer.
 Contains business logic for authentication operations.
 """
 
-from sqlalchemy.exc import IntegrityError
 
 from app.db_sqlite.users.repository import UserRepository
 from app.db_sqlite.users.schemas import UserRead

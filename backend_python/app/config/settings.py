@@ -128,8 +128,8 @@ class SessionCookieSettings(BaseSettings):
             decoded = base64.b64decode(v)
         except Exception as e:
             raise ValueError(
-                f"JUNJO_SECURE_COOKIE_KEY must be a valid base64 string. "
-                f"Generate with: openssl rand -base64 32"
+                "JUNJO_SECURE_COOKIE_KEY must be a valid base64 string. "
+                "Generate with: openssl rand -base64 32"
             ) from e
 
         # Validate exactly 32 bytes for AES-256

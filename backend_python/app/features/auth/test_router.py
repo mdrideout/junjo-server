@@ -163,7 +163,7 @@ async def test_sign_out():
             "/sign-in",
             json={"email": "test@example.com", "password": "password123"},
         )
-        session_cookie = sign_in_response.cookies["session"]
+        sign_in_response.cookies["session"]
 
         # Sign out
         response = await client.post("/sign-out")

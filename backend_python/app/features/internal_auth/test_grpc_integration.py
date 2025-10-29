@@ -10,7 +10,6 @@ import pytest
 from loguru import logger
 
 from app.config.settings import settings
-from app.db_sqlite.api_keys.repository import APIKeyRepository
 from proto_gen import auth_pb2, auth_pb2_grpc
 
 

@@ -1,7 +1,8 @@
 """API Key Pydantic schemas for validation and serialization."""
 
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class APIKeyCreate(BaseModel):

@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db_sqlite import db_config
 from app.db_sqlite.users.models import UserTable
-from app.db_sqlite.users.schemas import UserRead, UserInDB
+from app.db_sqlite.users.schemas import UserInDB, UserRead
 
 
 class UserRepository:

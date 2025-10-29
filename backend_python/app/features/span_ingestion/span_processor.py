@@ -12,7 +12,7 @@ Port of: backend/telemetry/otel_span_processor.go
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from loguru import logger
@@ -79,7 +79,7 @@ def convert_otlp_timestamp(ts_nano: int) -> datetime:
 
     Reference: otel_span_processor.go:163-164
     """
-    return datetime.fromtimestamp(ts_nano / 1e9, tz=timezone.utc)
+    return datetime.fromtimestamp(ts_nano / 1e9, tz=UTC)
 
 
 def extract_string_attribute(attributes: list[common_pb2.KeyValue], key: str) -> str:

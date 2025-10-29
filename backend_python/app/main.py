@@ -13,19 +13,20 @@ Pattern from wt_api_v2 (validated for production use).
 
 import asyncio
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from securecookies import SecureCookiesMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config.settings import settings
-from app.config.logger import setup_logging
 from app.common.responses import HealthResponse
-from app.features.auth import router as auth_router
+from app.config.logger import setup_logging
+from app.config.settings import settings
 from app.features.api_keys import router as api_keys_router
+from app.features.auth import router as auth_router
+from app.features.otel_spans import router as otel_spans_router
 from app.grpc_server import start_grpc_server_background, stop_grpc_server
-
 
 # Set up logging before anything else
 setup_logging()
@@ -47,7 +48,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("=" * 60)
     logger.info(f"Starting {settings.app_name}")
-    logger.info(f"Python 3.14+ with Pydantic v2")
+    logger.info("Python 3.14+ with Pydantic v2")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"FastAPI Server: {settings.host}:{settings.port}")
     logger.info(f"gRPC Server: [::]:{settings.GRPC_PORT}")
@@ -145,6 +146,9 @@ app.add_middleware(
 # === ROUTERS ===
 app.include_router(auth_router.router, tags=["auth"])
 app.include_router(api_keys_router.router)
+app.include_router(
+    otel_spans_router.router, prefix="/api/v1/observability", tags=["observability"]
+)
 
 
 # Health check endpoints

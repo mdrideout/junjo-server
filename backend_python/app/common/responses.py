@@ -5,10 +5,7 @@ Provides consistent response formats across all endpoints.
 Uses Pydantic v2+ conventions.
 """
 
-from typing import Generic, TypeVar
-from pydantic import BaseModel, Field, ConfigDict
-
-T = TypeVar("T")
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthResponse(BaseModel):
@@ -26,7 +23,7 @@ class ErrorResponse(BaseModel):
     detail: str | None = Field(default=None, description="Detailed error information")
 
 
-class SuccessResponse(BaseModel, Generic[T]):
+class SuccessResponse[T](BaseModel):
     """Generic success response with data"""
     success: bool = Field(default=True)
     data: T = Field(description="Response data")

@@ -2,8 +2,9 @@
 Unit tests for the internal authentication gRPC service.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.features.internal_auth.grpc_service import InternalAuthServicer
 from proto_gen import auth_pb2
