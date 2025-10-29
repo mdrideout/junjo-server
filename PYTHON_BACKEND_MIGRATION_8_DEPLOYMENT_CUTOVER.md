@@ -1,4 +1,4 @@
-# Phase 10: Deployment & Cutover
+# Phase 8: Deployment & Cutover
 
 ## Overview
 

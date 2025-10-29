@@ -1,4 +1,4 @@
-# Phase 8: LLM Playground with LiteLLM
+# Phase 7: LLM Playground with LiteLLM
 
 ## Overview
 
@@ -1031,4 +1031,4 @@ dependencies = [
 
 ## Next Phase
 
-Phase 9 will document the remaining features to migrate (OTEL spans API, etc.) and any missing components.
+Phase 8 (Deployment & Cutover) covers the strategy for transitioning from Go to Python backend in production.
