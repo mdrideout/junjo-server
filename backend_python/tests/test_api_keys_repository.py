@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.database.api_keys.repository import APIKeyRepository
+from app.db_sqlite.api_keys.repository import APIKeyRepository
 
 
 @pytest.mark.unit

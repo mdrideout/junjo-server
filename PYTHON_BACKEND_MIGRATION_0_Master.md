@@ -1,9 +1,9 @@
 # Python Backend Migration - Master Plan
 
-> **Status**: **Phase 4 Complete - Dual Backend Integration Working**
+> **Status**: **Phase 5 Complete - API Keys CRUD & gRPC Auth Working**
 > **Target**: Migrate Go backend to Python/FastAPI while maintaining feature parity
 > **Strategy**: Build new Python backend adjacent to old Go backend, test incrementally, then cut over
-> **Current**: Phases 1-3 complete (FastAPI base, SQLAlchemy, Auth). Docker integration working with auto-migrations.
+> **Current**: Phases 1-5 complete. Phase 6 (DuckDB Integration) in progress. Go backend disabled, 60 tests passing.
 
 ---
 
@@ -11,7 +11,7 @@
 
 **Context for AI Assistants resuming this migration:**
 
-### What's Been Completed (Phases 1-4)
+### What's Been Completed (Phases 1-5)
 
 ✅ **Phase 1: Base FastAPI Setup**
 - FastAPI app running on port 1324 (Go backend on 1323)
@@ -31,7 +31,6 @@
 - User model with bcrypt password hashing
 - Session cookies with Fernet encryption + HMAC signing
 - Endpoints: `/users/create-first-user`, `/sign-in`, `/sign-out`, `/auth-test`, `/users/db-has-users`
-- 23/23 tests passing in `tests/test_main.py`
 - Frontend successfully detects setup state and shows create-first-user form
 
 ✅ **Phase 4: Docker Integration (Dual Backend)**
@@ -40,6 +39,29 @@
 - Frontend routing: auth endpoints → Python (1324), legacy → Go (1323)
 - Auto-migration on container startup (matches `wt_api_v2` pattern)
 - Files: `docker-compose.yml`, `docker-compose.dev.yml`, `entrypoint.sh`
+
+✅ **Phase 5: API Keys Feature**
+- Full CRUD implementation: POST, GET, DELETE `/api_keys`
+- Router → Service → Repository pattern
+- 25 comprehensive tests (all passing)
+- E2E integration with frontend confirmed
+- Uses ID-based deletion (more secure than Go's key-based approach)
+
+✅ **gRPC Internal Auth Service**
+- Concurrent FastAPI + gRPC server architecture on port 50053
+- ValidateApiKey service for ingestion-service
+- 8 integration & concurrency tests passing
+- Critical bug fixed (None check for invalid keys)
+- E2E confirmed working with real traffic
+
+✅ **Go Backend Migration Complete**
+- Go backend disabled in docker-compose
+- All services depend on Python backend
+- Frontend routing updated
+- Ingestion service using Python backend for API key validation
+- E2E flow confirmed with real traffic
+
+**Test Summary: 60 tests passing** (25 API keys + 19 auth + 8 gRPC + 8 other)
 
 ### Key Architecture Decisions
 
@@ -108,20 +130,25 @@ uv run pytest tests/test_main.py -v
 2. Navigate to: `http://localhost:5151`
 3. Should see create-first-user form (since `junjo-python.db` is fresh)
 
-### Next Steps (Phase 5+)
+### Next Steps (Phase 6: DuckDB Integration)
 
-**Immediate:**
-- Complete first user creation E2E flow
-- Test sign-in/sign-out with frontend
-- Verify session persistence
+**Phase 6a: DuckDB Schema & Repository** (IN PROGRESS)
+- Create `app/db_duckdb/` directory structure
+- Implement DuckDB connection configuration
+- Create table schemas (spans + state_patches)
+- Implement batch insert repository
+- Reference: `backend/db_duckdb/` (Go implementation)
 
-**Phase 5: API Keys Feature** (not started)
-- First complete CRUD feature following router→service→repository pattern
-- Reference: `backend/internal/features/apikey/` (Go implementation)
+**Phase 6b: Span Ingestion** (TODO - Next)
+- Implement gRPC client for ingestion service
+- Create OTLP span processor (protobuf deserialization)
+- Build background poller (asyncio task, 5s interval)
+- Track last key in SQLite `poller_state` table
 
-**Phase 6: DuckDB Integration** (not started)
-- Connect to shared DuckDB for trace/span queries
-- Reference: `backend/internal/database/duckdb/` (Go implementation)
+**Phase 6c: Query Endpoints** (TODO)
+- Implement 6 REST API endpoints for span queries
+- Add Pydantic response models
+- Update frontend to use Python backend endpoints
 
 ### Common Commands
 

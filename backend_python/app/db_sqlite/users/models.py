@@ -8,7 +8,7 @@ from sqlalchemy import String, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from app.database.base import Base
+from app.db_sqlite.base import Base
 from app.common.utils import generate_id
 
 

@@ -10,7 +10,7 @@ See: backend_python/app/database/README.md for details on the test database patt
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.database.users.repository import UserRepository
+from app.db_sqlite.users.repository import UserRepository
 from app.main import app
 
 

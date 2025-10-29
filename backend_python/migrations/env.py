@@ -21,11 +21,11 @@ from alembic import context
 from app.config.settings import settings
 
 # Import Base to get metadata
-from app.database.base import Base
+from app.db_sqlite.base import Base
 
 # Import all models DIRECTLY (CRITICAL - ensures Alembic sees all tables)
 # Add new models here as they are created
-from app.database.users.models import UserTable  # noqa: F401
+from app.db_sqlite.users.models import UserTable  # noqa: F401
 # Future models:
 # from app.database.api_keys.models import APIKeyTable  # noqa: F401
 

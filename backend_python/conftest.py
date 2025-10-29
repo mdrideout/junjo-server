@@ -19,7 +19,7 @@ os.environ["DB_SQLITE_PATH"] = f"{_test_base_dir}/production_stub.db"
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from app.database.base import Base
+from app.db_sqlite.base import Base
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -33,7 +33,7 @@ async def test_db():
     """
     # Import models to register them with Base.metadata
     # Done here to ensure fresh registration for each test
-    from app.database import models  # noqa: F401
+    from app.db_sqlite import models  # noqa: F401
 
     # Create temporary database file
     temp_dir = tempfile.mkdtemp()
@@ -54,7 +54,7 @@ async def test_db():
     )
 
     # Override global session with test session
-    import app.database.db_config as db_config
+    import app.db_sqlite.db_config as db_config
     original_session = db_config.async_session
     original_engine = db_config.engine
     db_config.async_session = async_session_test

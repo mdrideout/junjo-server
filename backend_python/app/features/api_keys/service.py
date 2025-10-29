@@ -5,8 +5,8 @@ Handles business logic for API key management including secure key generation.
 
 import nanoid
 
-from app.database.api_keys.repository import APIKeyRepository
-from app.database.api_keys.schemas import APIKeyRead
+from app.db_sqlite.api_keys.repository import APIKeyRepository
+from app.db_sqlite.api_keys.schemas import APIKeyRead
 
 
 class APIKeyService:

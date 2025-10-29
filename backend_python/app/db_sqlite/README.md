@@ -5,7 +5,7 @@ This directory contains the database layer for the Junjo Python backend, impleme
 ## Architecture Overview
 
 ```
-app/database/
+app/db_sqlite/
 ├── base.py                    # SQLAlchemy declarative base
 ├── db_config.py              # Engine & session factory (CRITICAL - READ BELOW)
 └── users/

@@ -10,7 +10,7 @@ import pytest
 from loguru import logger
 
 from app.config.settings import settings
-from app.database.api_keys.repository import APIKeyRepository
+from app.db_sqlite.api_keys.repository import APIKeyRepository
 from proto_gen import auth_pb2, auth_pb2_grpc
 
 
@@ -26,7 +26,7 @@ async def test_validate_api_key_integration_with_production_key():
     - The production database to have at least one API key
 
     To create a production key for testing:
-        python -c "from app.database.api_keys.repository import APIKeyRepository; import asyncio, nanoid; asyncio.run(APIKeyRepository.create(id=nanoid.generate(size=21), key=nanoid.generate(size=64), name='Test Key'))"
+        python -c "from app.db_sqlite.api_keys.repository import APIKeyRepository; import asyncio, nanoid; asyncio.run(APIKeyRepository.create(id=nanoid.generate(size=21), key=nanoid.generate(size=64), name='Test Key'))"
     """
     # This test specifically uses the production key created earlier:
     # 9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz

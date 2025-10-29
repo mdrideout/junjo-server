@@ -6,8 +6,8 @@ Contains business logic for authentication operations.
 
 from sqlalchemy.exc import IntegrityError
 
-from app.database.users.repository import UserRepository
-from app.database.users.schemas import UserRead
+from app.db_sqlite.users.repository import UserRepository
+from app.db_sqlite.users.schemas import UserRead
 from app.features.auth.utils import hash_password, verify_password
 
 

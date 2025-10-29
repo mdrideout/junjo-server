@@ -9,7 +9,7 @@ import grpc
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.database.api_keys.repository import APIKeyRepository
+from app.db_sqlite.api_keys.repository import APIKeyRepository
 from proto_gen import auth_pb2, auth_pb2_grpc
 
 

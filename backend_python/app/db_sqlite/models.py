@@ -7,8 +7,8 @@ Pattern: Add new model imports here as you create them.
 """
 
 # Import all models here
-from app.database.users.models import UserTable  # noqa: F401
-from app.database.api_keys.models import APIKeyTable  # noqa: F401
+from app.db_sqlite.users.models import UserTable  # noqa: F401
+from app.db_sqlite.api_keys.models import APIKeyTable  # noqa: F401
 
 # Add future models here:
 # from app.database.projects.models import ProjectTable  # noqa: F401

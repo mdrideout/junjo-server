@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
-from app.database.users.schemas import (
+from app.db_sqlite.users.schemas import (
     AuthTestResponse,
     CreateUserRequest,
     DbHasUsersResponse,

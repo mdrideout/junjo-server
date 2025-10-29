@@ -46,6 +46,20 @@ class DatabaseSettings(BaseSettings):
         abs_path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite+aiosqlite:///{abs_path}"
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def duckdb_url(self) -> str:
+        """Computed DuckDB async URL with absolute path.
+
+        Returns:
+            DuckDB connection URL for async SQLAlchemy engine with absolute path.
+        """
+        # Resolve to absolute path (handles relative paths from any working directory)
+        abs_path = Path(self.duckdb_path).resolve()
+        # Ensure parent directory exists
+        abs_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"duckdb+aiosqlite:///{abs_path}"
+
     model_config = SettingsConfigDict(
         env_prefix="DB_",
         env_file=".env",

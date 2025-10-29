@@ -7,9 +7,9 @@ See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.database import db_config
-from app.database.users.models import UserTable
-from app.database.users.schemas import UserRead, UserInDB
+from app.db_sqlite import db_config
+from app.db_sqlite.users.models import UserTable
+from app.db_sqlite.users.schemas import UserRead, UserInDB
 
 
 class UserRepository:

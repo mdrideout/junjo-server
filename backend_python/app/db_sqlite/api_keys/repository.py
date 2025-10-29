@@ -7,9 +7,9 @@ See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.database import db_config
-from app.database.api_keys.models import APIKeyTable
-from app.database.api_keys.schemas import APIKeyRead
+from app.db_sqlite import db_config
+from app.db_sqlite.api_keys.models import APIKeyTable
+from app.db_sqlite.api_keys.schemas import APIKeyRead
 
 
 class APIKeyRepository:

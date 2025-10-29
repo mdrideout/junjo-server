@@ -54,6 +54,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"CORS origins: {settings.cors_origins}")
     logger.info("=" * 60)
 
+    # Initialize DuckDB tables
+    from app.db_duckdb.db_config import initialize_tables
+    initialize_tables()
+    logger.info("DuckDB tables initialized")
+
+    # TODO: Start background poller for ingestion service (Phase 6b)
+
     # Start gRPC server as background task
     grpc_task = asyncio.create_task(start_grpc_server_background())
     logger.info("gRPC server task created")
@@ -75,7 +82,7 @@ async def lifespan(app: FastAPI):
             logger.info("gRPC task cancelled")
 
     # Database cleanup
-    from app.database.db_config import checkpoint_wal, engine
+    from app.db_sqlite.db_config import checkpoint_wal, engine
 
     await checkpoint_wal()  # Checkpoint SQLite WAL
     logger.info("SQLite WAL checkpointed")

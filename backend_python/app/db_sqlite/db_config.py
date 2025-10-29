@@ -68,7 +68,7 @@ SQLAlchemyInstrumentor().instrument(
 
 # Import all models to register them with Base.metadata
 # This ensures Base.metadata.create_all() knows about all tables
-from app.database import models  # noqa: F401, E402
+from app.db_sqlite import models  # noqa: F401, E402
 
 
 
