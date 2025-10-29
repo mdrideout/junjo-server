@@ -59,7 +59,10 @@ async def lifespan(app: FastAPI):
     initialize_tables()
     logger.info("DuckDB tables initialized")
 
-    # TODO: Start background poller for ingestion service (Phase 6b)
+    # Start span ingestion poller as background task
+    from app.features.span_ingestion.background_poller import span_ingestion_poller
+    poller_task = asyncio.create_task(span_ingestion_poller())
+    logger.info("Span ingestion poller task created")
 
     # Start gRPC server as background task
     grpc_task = asyncio.create_task(start_grpc_server_background())
@@ -70,7 +73,15 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down application")
 
-    # Stop gRPC server first
+    # Stop span ingestion poller
+    if not poller_task.done():
+        poller_task.cancel()
+        try:
+            await poller_task
+        except asyncio.CancelledError:
+            logger.info("Span ingestion poller cancelled")
+
+    # Stop gRPC server
     await stop_grpc_server()
 
     # Cancel gRPC task if still running

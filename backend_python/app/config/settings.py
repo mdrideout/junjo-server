@@ -183,6 +183,59 @@ class IngestionServiceSettings(BaseSettings):
     )
 
 
+class SpanIngestionSettings(BaseSettings):
+    """Span ingestion poller configuration"""
+
+    INGESTION_HOST: Annotated[
+        str,
+        Field(
+            default="junjo-server-ingestion",
+            description="Ingestion service hostname for span reading"
+        )
+    ]
+    INGESTION_PORT: Annotated[
+        int,
+        Field(
+            default=50052,
+            ge=1,
+            le=65535,
+            description="Ingestion service gRPC port"
+        )
+    ]
+    SPAN_POLL_INTERVAL: Annotated[
+        int,
+        Field(
+            default=5,
+            ge=1,
+            le=3600,
+            description="Span polling interval in seconds"
+        )
+    ]
+    SPAN_BATCH_SIZE: Annotated[
+        int,
+        Field(
+            default=100,
+            ge=1,
+            le=10000,
+            description="Maximum spans to read per poll"
+        )
+    ]
+    SPAN_STRICT_MODE: Annotated[
+        bool,
+        Field(
+            default=False,
+            description="If True, fail entire batch on state patch errors"
+        )
+    ]
+
+    model_config = SettingsConfigDict(
+        env_prefix="SPAN_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
 class AppSettings(BaseSettings):
     """Main application settings"""
 
@@ -260,6 +313,13 @@ class AppSettings(BaseSettings):
         Field(
             default_factory=IngestionServiceSettings,
             description="Ingestion service settings"
+        )
+    ]
+    span_ingestion: Annotated[
+        SpanIngestionSettings,
+        Field(
+            default_factory=SpanIngestionSettings,
+            description="Span ingestion poller settings"
         )
     ]
 

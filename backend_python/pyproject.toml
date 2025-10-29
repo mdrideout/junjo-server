@@ -37,6 +37,7 @@ dependencies = [
     "grpcio>=1.68.0",       # gRPC runtime library
     "grpcio-tools>=1.68.0", # Protobuf compiler and code generator
     "protobuf>=5.29.0",     # Protocol Buffers runtime
+    "opentelemetry-proto>=1.28.0",  # OpenTelemetry Protocol (OTLP) protobuf definitions
 ]
 
 [project.optional-dependencies]
