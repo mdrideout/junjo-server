@@ -38,11 +38,18 @@ const LLM_ENDPOINTS = [
   '/llm/providers',
 ]
 
+// OTEL/Traces/Logs endpoints use Python backend
+const OTEL_ENDPOINTS = [
+  '/api/v1/observability',
+  '/otel', // Legacy format for migration
+]
+
 /**
  * Get the appropriate backend host for a given endpoint.
  *
  * Auth endpoints → Python backend (port 1324)
  * LLM endpoints → Python backend (port 1324)
+ * OTEL endpoints → Python backend (port 1324)
  * All other endpoints → Go backend (port 1323)
  */
 export function getApiHost(endpoint: string): string {
@@ -56,8 +63,14 @@ export function getApiHost(endpoint: string): string {
     endpoint.startsWith(llmPath) || endpoint.includes(llmPath)
   )
 
+  // Check if this is an OTEL endpoint
+  const isOTELEndpoint = OTEL_ENDPOINTS.some(otelPath =>
+    endpoint.startsWith(otelPath) || endpoint.includes(otelPath)
+  )
+
   if (isAuthEndpoint) return BACKEND_HOSTS.python
   if (isLLMEndpoint) return BACKEND_HOSTS.python
+  if (isOTELEndpoint) return BACKEND_HOSTS.python
 
   return BACKEND_HOSTS.go
 }

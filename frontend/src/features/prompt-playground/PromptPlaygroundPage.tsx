@@ -186,7 +186,8 @@ export default function PromptPlaygroundPage() {
       try {
         setLoading(true)
         setError(false)
-        const endpoint = `/otel/trace/${traceId}/span/${spanId}`
+        // Use Python backend endpoint
+        const endpoint = `/api/v1/observability/traces/${traceId}/spans/${spanId}`
         const apiHost = getApiHost(endpoint)
         const response = await fetch(`${apiHost}${endpoint}`, {
           credentials: 'include',
