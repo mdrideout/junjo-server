@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.features.internal_auth.grpc_service import InternalAuthServicer
-from proto_gen import auth_pb2
+from app.proto_gen import auth_pb2
 
 
 @pytest.mark.unit

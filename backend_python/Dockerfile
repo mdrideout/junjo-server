@@ -41,24 +41,17 @@ COPY --from=base /app/.venv ./.venv
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH=/app
 
-# Copy shared proto files and generate Python code
-COPY proto/ ../proto/
-RUN mkdir -p proto_gen && \
-    python -m grpc_tools.protoc \
-      -I../proto \
-      --python_out=./proto_gen \
-      --grpc_python_out=./proto_gen \
-      ../proto/*.proto && \
-    # Fix imports to use relative imports
-    for file in ./proto_gen/*_grpc.py; do \
-      if [ -f "$file" ]; then \
-        sed -i 's/^import \([a-z_]*\)_pb2 as/from . import \1_pb2 as/g' "$file"; \
-      fi; \
-    done && \
-    touch proto_gen/__init__.py
-
-# Copy application code
+# Copy application code first
 COPY backend_python/app ./app
+
+# Copy proto generation script and shared proto files
+COPY backend_python/scripts/generate_proto.sh /tmp/generate_proto.sh
+COPY proto/ ../proto/
+
+# Generate proto files using unified script
+RUN chmod +x /tmp/generate_proto.sh && \
+    /tmp/generate_proto.sh /app/app/proto_gen /app/../proto && \
+    rm /tmp/generate_proto.sh
 COPY backend_python/.env.example ./.env.example
 
 # Copy Alembic configuration and migrations

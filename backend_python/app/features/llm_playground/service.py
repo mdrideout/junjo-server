@@ -8,11 +8,13 @@ LiteLLM provides:
 - Automatic API key management from environment variables
 """
 
+import os
 from typing import Any, Dict, Optional
 
 from litellm import acompletion
 from loguru import logger
 
+from app.config.settings import settings
 from app.features.llm_playground.schemas import (
     Choice,
     GenerateRequest,
@@ -24,6 +26,21 @@ from app.features.llm_playground.schemas import (
 
 class LLMService:
     """Service for LLM operations using LiteLLM."""
+
+    @staticmethod
+    def _setup_litellm_env():
+        """
+        Set up environment variables for LiteLLM from Pydantic settings.
+
+        LiteLLM reads API keys from os.environ, so we need to explicitly set them
+        from our Pydantic settings before calling acompletion().
+        """
+        if settings.llm.openai_api_key:
+            os.environ["OPENAI_API_KEY"] = settings.llm.openai_api_key
+        if settings.llm.anthropic_api_key:
+            os.environ["ANTHROPIC_API_KEY"] = settings.llm.anthropic_api_key
+        if settings.llm.gemini_api_key:
+            os.environ["GEMINI_API_KEY"] = settings.llm.gemini_api_key
 
     @staticmethod
     def _prepare_response_format(
@@ -72,6 +89,8 @@ class LLMService:
             Exception: If generation fails (API errors, invalid parameters, etc.)
         """
         try:
+            # Set up LiteLLM environment variables from Pydantic settings
+            LLMService._setup_litellm_env()
             # Prepare LiteLLM kwargs with explicit type annotation
             kwargs: Dict[str, Any] = {
                 "model": request.model,

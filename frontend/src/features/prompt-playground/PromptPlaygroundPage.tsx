@@ -10,7 +10,7 @@ import ProviderSelector from './components/ProviderSelector'
 import { Switch } from '../../components/catalyst/switch'
 import { getSpanDurationString } from '../../util/duration-utils'
 import CircularProgress from '../../components/CircularProgress'
-import { detectProviderWarnings, detectGeminiJsonSchema, detectJsonSchema } from './utils/provider-warnings'
+import { detectProviderWarnings, detectJsonSchema } from './utils/provider-warnings'
 import { mapOtelProviderToInternal } from './utils/provider-mapping'
 import { ensureOpenAISchemaCompatibility } from './utils/schema-utils'
 import ProviderWarningBanner from './components/ProviderWarningBanner'
@@ -119,17 +119,19 @@ export default function PromptPlaygroundPage() {
 
   useEffect(() => {
     if (span) {
-      // Extract and set model
-      const modelName = span.attributes_json['llm.model_name'] || 'Unknown'
-      dispatch(PromptPlaygroundActions.setSelectedModel(modelName))
-      setOriginalModel(modelName)
-
-      // Extract and set provider using OpenInference mapping
+      // Extract and set provider using OpenInference mapping first
       // OpenInference uses "google" for Gemini, we use "gemini" internally
       const otelProviderName = span.attributes_json['llm.provider']
       const internalProvider = otelProviderName ? mapOtelProviderToInternal(otelProviderName) : 'gemini'
       dispatch(PromptPlaygroundActions.setSelectedProvider(internalProvider))
       setOriginalProvider(internalProvider)
+
+      // Extract and set model with provider prefix for LiteLLM
+      const modelName = span.attributes_json['llm.model_name'] || 'Unknown'
+      // Construct full model ID with provider prefix (e.g., "gemini/gemini-2.5-flash-lite")
+      const fullModelId = modelName.includes('/') ? modelName : `${internalProvider}/${modelName}`
+      dispatch(PromptPlaygroundActions.setSelectedModel(fullModelId))
+      setOriginalModel(fullModelId)
 
       // Set JSON mode if MIME type is application/json
       const mimeType = span.attributes_json['input.mime_type']

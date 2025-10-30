@@ -80,9 +80,11 @@ export default function ModelSelector(props: ModelSelectorProps) {
     ) {
       // Add original model with provider prefix format if not already present
       const modelId = originalModel.includes('/') ? originalModel : `${provider}/${originalModel}`
+      // Extract display name (remove provider prefix if present)
+      const displayName = originalModel.includes('/') ? originalModel.split('/')[1] : originalModel
       result.push({
         id: modelId,
-        display_name: originalModel,
+        display_name: displayName,
         provider: provider || 'unknown',
         supports_reasoning: false,
         supports_vision: false,

@@ -10,7 +10,7 @@ import pytest
 from loguru import logger
 
 from app.config.settings import settings
-from proto_gen import auth_pb2, auth_pb2_grpc
+from app.proto_gen import auth_pb2, auth_pb2_grpc
 
 
 @pytest.mark.integration

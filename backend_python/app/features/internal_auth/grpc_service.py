@@ -9,7 +9,7 @@ import grpc
 from loguru import logger
 
 from app.db_sqlite.api_keys.repository import APIKeyRepository
-from proto_gen import auth_pb2, auth_pb2_grpc
+from app.proto_gen import auth_pb2, auth_pb2_grpc
 
 
 class InternalAuthServicer(auth_pb2_grpc.InternalAuthServiceServicer):

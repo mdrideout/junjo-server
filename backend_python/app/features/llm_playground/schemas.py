@@ -26,7 +26,11 @@ class GenerateRequest(BaseModel):
     - gemini/gemini-2.5-pro, gemini/gemini-2.5-flash
     """
 
-    model: str = Field(..., description="Model with provider prefix")
+    model: str = Field(
+        ...,
+        description="Model with provider prefix (e.g., 'gemini/gemini-2.5-flash', 'openai/gpt-4o')",
+        pattern=r"^[a-z_]+/[a-z0-9._-]+$"
+    )
     messages: List[Message] = Field(..., description="Chat messages")
 
     # Common generation parameters
@@ -38,7 +42,8 @@ class GenerateRequest(BaseModel):
     # Reasoning/thinking (unified - LiteLLM translates to provider-specific)
     reasoning_effort: Optional[str] = Field(
         None,
-        description="Reasoning effort: 'low', 'medium', 'high'. Auto-translates to provider thinking.",
+        description="Reasoning effort: 'minimal', 'low', 'medium', 'high'. Auto-translates to provider thinking.",
+        pattern="^(minimal|low|medium|high)$"
     )
 
     # OpenAI-specific (for reasoning models)

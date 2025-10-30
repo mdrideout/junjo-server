@@ -16,7 +16,7 @@ export const LiteLLMMessageSchema = z.object({
 export type LiteLLMMessage = z.infer<typeof LiteLLMMessageSchema>
 
 // LiteLLM Reasoning Effort Schema
-export const LiteLLMReasoningEffortSchema = z.enum(['low', 'medium', 'high'])
+export const LiteLLMReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high'])
 
 export type LiteLLMReasoningEffort = z.infer<typeof LiteLLMReasoningEffortSchema>
 
@@ -95,7 +95,7 @@ export const LiteLLMResponseSchema = z.object({
   model: z.string(),
   choices: z.array(LiteLLMChoiceSchema),
   usage: LiteLLMUsageSchema.optional(),
-  reasoning_content: z.string().optional(), // For OpenAI o1/Anthropic extended thinking
+  reasoning_content: z.string().nullish(), // For OpenAI o1/Anthropic extended thinking (allows null or undefined)
 })
 
 export type LiteLLMResponse = z.infer<typeof LiteLLMResponseSchema>

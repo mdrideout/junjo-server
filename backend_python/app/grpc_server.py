@@ -11,7 +11,7 @@ from loguru import logger
 
 from app.config.settings import settings
 from app.features.internal_auth.grpc_service import InternalAuthServicer
-from proto_gen import auth_pb2_grpc
+from app.proto_gen import auth_pb2_grpc
 
 # Global reference to the gRPC server for graceful shutdown
 _grpc_server: grpc.aio.Server | None = None
