@@ -1,15 +1,18 @@
-import { API_HOST } from '../../../config'
+import { getApiHost } from '../../../config'
 
+/**
+ * Model information from the unified Python backend.
+ *
+ * Matches backend schema:
+ * backend_python/app/features/llm_playground/schemas.py:ModelInfo
+ */
 export interface ModelInfo {
-  id: string
-  name: string
-  provider: string
-  description?: string
-  contextWindow?: number
-  maxOutputTokens?: number
-  createdAt?: string
-  capabilities?: string[]
-  metadata?: Record<string, string>
+  id: string // Full model name with provider prefix (e.g., 'openai/gpt-4o')
+  provider: string // Provider name: 'openai', 'anthropic', 'gemini'
+  display_name: string // Human-readable model name
+  supports_reasoning: boolean // Supports reasoning/thinking
+  supports_vision: boolean // Supports vision/image inputs
+  max_tokens: number | null // Maximum context tokens
 }
 
 interface ModelsResponse {
@@ -20,7 +23,10 @@ interface ModelsResponse {
  * Fetch all available models from all providers
  */
 export const fetchAllModels = async (): Promise<ModelInfo[]> => {
-  const response = await fetch(`${API_HOST}/llm/models`, {
+  const endpoint = '/llm/models'
+  const apiHost = getApiHost(endpoint)
+
+  const response = await fetch(`${apiHost}${endpoint}`, {
     method: 'GET',
     credentials: 'include',
   })
@@ -34,10 +40,13 @@ export const fetchAllModels = async (): Promise<ModelInfo[]> => {
 }
 
 /**
- * Fetch models for a specific provider
+ * Fetch models for a specific provider (openai, anthropic, gemini)
  */
 export const fetchModelsByProvider = async (provider: string): Promise<ModelInfo[]> => {
-  const response = await fetch(`${API_HOST}/llm/providers/${provider}/models`, {
+  const endpoint = `/llm/providers/${provider}/models`
+  const apiHost = getApiHost(endpoint)
+
+  const response = await fetch(`${apiHost}${endpoint}`, {
     method: 'GET',
     credentials: 'include',
   })
@@ -51,10 +60,13 @@ export const fetchModelsByProvider = async (provider: string): Promise<ModelInfo
 }
 
 /**
- * Refresh models from provider API
+ * Force refresh models from provider API (bypass cache)
  */
 export const refreshModelsByProvider = async (provider: string): Promise<ModelInfo[]> => {
-  const response = await fetch(`${API_HOST}/llm/providers/${provider}/models/refresh`, {
+  const endpoint = `/llm/providers/${provider}/models/refresh`
+  const apiHost = getApiHost(endpoint)
+
+  const response = await fetch(`${apiHost}${endpoint}`, {
     method: 'POST',
     credentials: 'include',
   })
@@ -63,6 +75,7 @@ export const refreshModelsByProvider = async (provider: string): Promise<ModelIn
     throw new Error(`Failed to refresh models for ${provider}: ${response.statusText}`)
   }
 
-  // After refresh, fetch the updated models
-  return fetchModelsByProvider(provider)
+  // Backend returns the refreshed models directly
+  const data: ModelsResponse = await response.json()
+  return data.models
 }

@@ -283,20 +283,20 @@ function ModelCard({ model, isSelected, onSelect }: ModelCardProps) {
             <span className="text-xs text-zinc-500 dark:text-zinc-400">{original.id}</span>
           </div>
 
-          {/* Generally the description is redundant. */}
-          {/* {original.description && (
-            <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-1.5">{original.description}</div>
-          )} */}
           <div className="flex gap-3 mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {original.contextWindow && (
+            {original.max_tokens && (
               <span>
-                <span className="font-medium">Context:</span> {original.contextWindow.toLocaleString()} tokens
+                <span className="font-medium">Max tokens:</span> {original.max_tokens.toLocaleString()}
               </span>
             )}
-            {original.maxOutputTokens && (
-              <span>
-                <span className="font-medium">Max output:</span> {original.maxOutputTokens.toLocaleString()}{' '}
-                tokens
+            {original.supports_reasoning && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                Reasoning
+              </span>
+            )}
+            {original.supports_vision && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                Vision
               </span>
             )}
           </div>
@@ -331,20 +331,24 @@ function OriginalModelCard({ model, onSelect }: OriginalModelCardProps) {
         <div className="flex-1">
           <div className="flex items-baseline gap-1">
             <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
-              {model.name || model.id}
+              {model.display_name || model.id}
             </span>
           </div>
           <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{model.id}</div>
           <div className="flex gap-3 mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {model.contextWindow && (
+            {model.max_tokens && (
               <span>
-                <span className="font-medium">Context:</span> {model.contextWindow.toLocaleString()} tokens
+                <span className="font-medium">Max tokens:</span> {model.max_tokens.toLocaleString()}
               </span>
             )}
-            {model.maxOutputTokens && (
-              <span>
-                <span className="font-medium">Max output:</span> {model.maxOutputTokens.toLocaleString()}{' '}
-                tokens
+            {model.supports_reasoning && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                Reasoning
+              </span>
+            )}
+            {model.supports_vision && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                Vision
               </span>
             )}
           </div>

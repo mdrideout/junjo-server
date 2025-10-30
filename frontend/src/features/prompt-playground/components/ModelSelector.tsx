@@ -78,10 +78,15 @@ export default function ModelSelector(props: ModelSelectorProps) {
       provider === originalProvider &&
       !models.find((m) => m.id === originalModel)
     ) {
+      // Add original model with provider prefix format if not already present
+      const modelId = originalModel.includes('/') ? originalModel : `${provider}/${originalModel}`
       result.push({
-        id: originalModel,
-        name: originalModel,
+        id: modelId,
+        display_name: originalModel,
         provider: provider || 'unknown',
+        supports_reasoning: false,
+        supports_vision: false,
+        max_tokens: null,
       })
     }
     return result

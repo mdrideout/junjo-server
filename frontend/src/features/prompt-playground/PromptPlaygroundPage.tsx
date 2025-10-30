@@ -1,11 +1,9 @@
 import { Link, useParams } from 'react-router'
 import { useEffect, useState, useRef } from 'react'
 import { OtelSpan } from '../traces/schemas/schemas'
-import { API_HOST } from '../../config'
+import { getApiHost } from '../../config'
 import { useAppDispatch, useAppSelector } from '../../root-store/hooks'
-import { openaiRequest } from './fetch/openai-request'
-import { anthropicRequest } from './fetch/anthropic-request'
-import { geminiRequest } from './fetch/gemini-request'
+import { litellmRequest } from './fetch/litellm-request'
 import { PromptPlaygroundActions } from './store/slice'
 import ModelSelector from './components/ModelSelector'
 import ProviderSelector from './components/ProviderSelector'
@@ -188,7 +186,9 @@ export default function PromptPlaygroundPage() {
       try {
         setLoading(true)
         setError(false)
-        const response = await fetch(`${API_HOST}/otel/trace/${traceId}/span/${spanId}`, {
+        const endpoint = `/otel/trace/${traceId}/span/${spanId}`
+        const apiHost = getApiHost(endpoint)
+        const response = await fetch(`${apiHost}${endpoint}`, {
           credentials: 'include',
         })
         if (!response.ok) {
@@ -308,129 +308,41 @@ export default function PromptPlaygroundPage() {
       dispatch(PromptPlaygroundActions.setLoading(true))
       dispatch(PromptPlaygroundActions.setError(null))
 
-      let outputText = ''
+      // Unified LiteLLM request
+      // LiteLLM automatically routes to the correct provider based on model prefix
+      // (e.g., openai/gpt-4o, anthropic/claude-3-5-sonnet, gemini/gemini-2.5-pro)
+      const result = await litellmRequest({
+        model: selectedModel,
+        messages: [{ role: 'user', content: prompt }],
 
-      // Build provider-specific requests
-      if (selectedProvider === 'openai') {
-        // Check if it's a reasoning model (o1, o3, o4, gpt-5 series)
-        const isReasoningModel = selectedModel ? /^(o1-|o3-|o4-|gpt-5)/.test(selectedModel) : false
+        // Common parameters (work across all providers)
+        ...(generationSettings.temperature !== undefined && {
+          temperature: generationSettings.temperature,
+        }),
+        ...(generationSettings.max_tokens && {
+          max_tokens: generationSettings.max_tokens,
+        }),
 
-        const result = await openaiRequest({
-          model: selectedModel,
-          messages: [{ role: 'user', content: prompt }],
-          // Structured output with JSON schema (when schema available)
-          ...(jsonMode && jsonSchema && {
-            response_format: {
-              type: 'json_schema',
-              json_schema: {
-                name: 'structured_output',
-                strict: true,
-                // Ensure schema has additionalProperties: false at all levels for OpenAI strict mode
-                schema: ensureOpenAISchemaCompatibility(jsonSchema),
-              },
-            },
+        // JSON mode / Structured output
+        ...(jsonMode && {
+          json_mode: true,
+          ...(jsonSchema && {
+            json_schema: ensureOpenAISchemaCompatibility(jsonSchema),
           }),
-          // Schema-less JSON mode (when no schema available)
-          ...(jsonMode && !jsonSchema && {
-            response_format: { type: 'json_object' },
-          }),
-          // Only send reasoning_effort for reasoning models
-          ...(isReasoningModel &&
-            generationSettings.reasoning_effort && { reasoning_effort: generationSettings.reasoning_effort }),
-          ...(isReasoningModel &&
-            generationSettings.max_completion_tokens && {
-              max_completion_tokens: generationSettings.max_completion_tokens,
-            }),
-          // Only send temperature for non-reasoning models
-          ...(!isReasoningModel &&
-            generationSettings.temperature !== undefined && { temperature: generationSettings.temperature }),
-          // max_tokens for non-reasoning models
-          ...(!isReasoningModel &&
-            generationSettings.max_completion_tokens && {
-              max_tokens: generationSettings.max_completion_tokens,
-            }),
-        })
-        outputText = result.choices[0]?.message?.content || ''
-      } else if (selectedProvider === 'anthropic') {
-        const result = await anthropicRequest({
-          model: selectedModel,
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: generationSettings.max_tokens || 4096,
-          // Structured output with JSON schema (when schema available)
-          ...(jsonMode && jsonSchema && {
-            tools: [
-              {
-                name: 'structured_output',
-                description: 'Return data in structured JSON format',
-                input_schema: jsonSchema,
-              },
-            ],
-            tool_choice: { type: 'tool', name: 'structured_output' },
-          }),
-          // Schema-less JSON mode (when no schema available)
-          ...(jsonMode && !jsonSchema && {
-            jsonMode: true,
-          }),
-          ...(generationSettings.thinking_enabled &&
-            generationSettings.thinking_budget_tokens && {
-              thinking: {
-                type: 'enabled' as const,
-                budget_tokens: generationSettings.thinking_budget_tokens,
-              },
-            }),
-          ...(generationSettings.temperature !== undefined && {
-            temperature: generationSettings.temperature,
-          }),
-        })
-        // Extract output from response
-        // If JSON mode, extract from tool use, otherwise from text
-        if (jsonMode && result.content.length > 0) {
-          const toolUseBlock = result.content.find((block) => block.type === 'tool_use')
-          if (toolUseBlock && toolUseBlock.input) {
-            outputText = JSON.stringify(toolUseBlock.input, null, 2)
-          }
-        } else {
-          const textBlock = result.content.find((block) => block.type === 'text')
-          outputText = textBlock?.text || ''
-        }
-      } else if (selectedProvider === 'gemini') {
-        const result = await geminiRequest({
-          model: selectedModel,
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            // Structured output with JSON schema (when schema available)
-            ...(jsonMode && jsonSchema && {
-              responseMimeType: 'application/json',
-              response_json_schema: jsonSchema,
-            }),
-            // Schema-less JSON mode (when no schema available)
-            ...(jsonMode && !jsonSchema && {
-              responseMimeType: 'application/json',
-            }),
-            ...(generationSettings.temperature !== undefined && {
-              temperature: generationSettings.temperature,
-            }),
-            ...(generationSettings.maxOutputTokens && {
-              maxOutputTokens: generationSettings.maxOutputTokens,
-            }),
-            ...((generationSettings.thinkingBudget !== undefined ||
-              generationSettings.includeThoughts !== undefined) && {
-              thinkingConfig: {
-                ...(generationSettings.thinkingBudget !== undefined && {
-                  thinkingBudget: generationSettings.thinkingBudget,
-                }),
-                ...(generationSettings.includeThoughts !== undefined && {
-                  includeThoughts: generationSettings.includeThoughts,
-                }),
-              },
-            }),
-          },
-        })
-        outputText = result.candidates[0]?.content?.parts[0]?.text || ''
-      } else {
-        throw new Error(`Unknown provider: ${selectedProvider}`)
-      }
+        }),
 
+        // Reasoning/thinking (LiteLLM auto-translates to provider-specific)
+        ...(generationSettings.reasoning_effort && {
+          reasoning_effort: generationSettings.reasoning_effort,
+        }),
+
+        // OpenAI reasoning models specific
+        ...(generationSettings.max_completion_tokens && {
+          max_completion_tokens: generationSettings.max_completion_tokens,
+        }),
+      })
+
+      const outputText = result.choices[0]?.message?.content || ''
       dispatch(PromptPlaygroundActions.setOutput(outputText))
       setTestEndTime(new Date().toISOString())
     } catch (error) {

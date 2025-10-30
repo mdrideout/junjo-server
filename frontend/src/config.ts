@@ -32,10 +32,17 @@ const AUTH_ENDPOINTS = [
   '/api_keys',
 ]
 
+// LLM endpoints use Python backend (unified LiteLLM implementation)
+const LLM_ENDPOINTS = [
+  '/llm/generate',
+  '/llm/providers',
+]
+
 /**
  * Get the appropriate backend host for a given endpoint.
  *
  * Auth endpoints → Python backend (port 1324)
+ * LLM endpoints → Python backend (port 1324)
  * All other endpoints → Go backend (port 1323)
  */
 export function getApiHost(endpoint: string): string {
@@ -44,7 +51,15 @@ export function getApiHost(endpoint: string): string {
     endpoint.startsWith(authPath) || endpoint.includes(authPath)
   )
 
-  return isAuthEndpoint ? BACKEND_HOSTS.python : BACKEND_HOSTS.go
+  // Check if this is an LLM endpoint
+  const isLLMEndpoint = LLM_ENDPOINTS.some(llmPath =>
+    endpoint.startsWith(llmPath) || endpoint.includes(llmPath)
+  )
+
+  if (isAuthEndpoint) return BACKEND_HOSTS.python
+  if (isLLMEndpoint) return BACKEND_HOSTS.python
+
+  return BACKEND_HOSTS.go
 }
 
 // Legacy API_HOST export (uses Go backend by default for backward compatibility)
