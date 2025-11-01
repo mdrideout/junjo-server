@@ -49,10 +49,9 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("=" * 60)
-    logger.info(f"Starting {settings.app_name}")
-    logger.info("Python 3.14+ with Pydantic v2")
-    logger.info(f"Debug mode: {settings.debug}")
-    logger.info(f"FastAPI Server: {settings.host}:{settings.port}")
+    logger.info("Starting Junjo Server")
+    logger.info("Python 3.13+ with Pydantic v2")
+    logger.info(f"FastAPI Server: http://0.0.0.0:{settings.port}")
     logger.info(f"gRPC Server: [::]:{settings.GRPC_PORT}")
     logger.info(f"CORS origins: {settings.cors_origins}")
     logger.info("=" * 60)
@@ -72,6 +71,38 @@ async def lifespan(app: FastAPI):
     from app.db_duckdb.db_config import initialize_tables
     initialize_tables()
     logger.info("DuckDB tables initialized")
+
+    # Validate deployment configuration
+    logger.info("-" * 60)
+    if settings.session_cookie.junjo_env == "production":
+        # Production mode checks
+        logger.info("🔒 Production mode detected")
+
+        # Validate CORS origins
+        if not settings.cors_origins or settings.cors_origins == ["*"]:
+            logger.error(
+                "❌ PRODUCTION ERROR: CORS_ORIGINS must be explicitly configured. "
+                "Set CORS_ORIGINS environment variable to your frontend domain(s). "
+                "See docs/DEPLOYMENT.md for details."
+            )
+            raise ValueError("CORS_ORIGINS required in production")
+
+        logger.info("✅ HTTPS-only cookies enabled")
+        logger.info(f"✅ CORS origins configured: {settings.cors_origins}")
+        logger.info("✅ Session cookies: Encrypted (AES-256) + Signed (HMAC)")
+        logger.info("✅ CSRF protection: SameSite=Strict")
+        logger.info("")
+        logger.info("⚠️  DEPLOYMENT REQUIREMENT:")
+        logger.info("   Backend and frontend must be on same domain")
+        logger.info("   (e.g., api.example.com + app.example.com)")
+        logger.info("   See docs/DEPLOYMENT.md for setup instructions")
+    else:
+        # Development mode
+        logger.info("🔧 Development mode")
+        logger.info("⚠️  HTTPS-only cookies disabled (development only)")
+        logger.info("✅ Session cookies: Encrypted (AES-256) + Signed (HMAC)")
+        logger.info("✅ CSRF protection: SameSite=Strict")
+    logger.info("-" * 60)
 
     # Start span ingestion poller as background task
     from app.features.span_ingestion.background_poller import span_ingestion_poller
@@ -117,11 +148,13 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.app_name,
+    title="Junjo Server",
     description="LLM Observability Platform - Python Backend",
     version="0.1.0",
-    debug=settings.debug,
     lifespan=lifespan,
+    # Disable Swagger UI and ReDoc (not needed for production deployments)
+    docs_url=None,
+    redoc_url=None,
 )
 
 # CORS middleware
@@ -200,12 +233,11 @@ async def root() -> dict[str, str]:
     """Root endpoint with API information.
 
     Returns:
-        Dictionary containing app name, version, and documentation links.
+        Dictionary containing app name, version, and health check link.
     """
     return {
-        "app": settings.app_name,
+        "app": "Junjo Server",
         "version": "0.1.0",
-        "docs": "/docs",
         "health": "/health",
     }
 
@@ -213,10 +245,13 @@ async def root() -> dict[str, str]:
 if __name__ == "__main__":
     import uvicorn
 
+    # Auto-reload in development only
+    reload = settings.session_cookie.junjo_env == "development"
+
     uvicorn.run(
         "app.main:app",
-        host=settings.host,
+        host="0.0.0.0",  # Listen on all interfaces (required for Docker)
         port=settings.port,
-        reload=settings.debug,
+        reload=reload,
         log_config=None,  # Disable uvicorn logging (we use loguru)
     )

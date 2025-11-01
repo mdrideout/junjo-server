@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status
 import httpx
 from loguru import logger
 
-from app.features.auth.dependencies import CurrentUserEmail
+from app.features.auth.dependencies import CurrentUser
 from app.features.llm_playground.models import get_models_for_provider
 from app.features.llm_playground.schemas import GenerateRequest, GenerateResponse, ModelsResponse
 from app.features.llm_playground.service import LLMService
@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate(request: GenerateRequest, authenticated_user: CurrentUserEmail):
+async def generate(request: GenerateRequest, authenticated_user: CurrentUser):
     """
     Generate LLM completion (unified endpoint for all providers).
 
@@ -51,7 +51,7 @@ async def generate(request: GenerateRequest, authenticated_user: CurrentUserEmai
 
 
 @router.get("/providers/{provider}/models", response_model=ModelsResponse)
-async def list_provider_models(provider: str, authenticated_user: CurrentUserEmail):
+async def list_provider_models(provider: str, authenticated_user: CurrentUser):
     """
     List models for specific provider.
 
@@ -98,7 +98,7 @@ async def list_provider_models(provider: str, authenticated_user: CurrentUserEma
 
 
 @router.post("/providers/{provider}/models/refresh", response_model=ModelsResponse)
-async def refresh_provider_models(provider: str, authenticated_user: CurrentUserEmail):
+async def refresh_provider_models(provider: str, authenticated_user: CurrentUser):
     """
     Force refresh models from provider API (bypass cache).
 

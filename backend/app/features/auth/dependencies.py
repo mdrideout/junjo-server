@@ -94,7 +94,3 @@ async def get_authenticated_user(request: Request) -> AuthenticatedUser:
 # Type alias for dependency injection
 # Use this in route signatures: authenticated_user: CurrentUser
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_authenticated_user)]
-
-# Deprecated alias for backward compatibility during migration
-# TODO: Remove after all code updated to use CurrentUser
-CurrentUserEmail = CurrentUser

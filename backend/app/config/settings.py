@@ -272,37 +272,14 @@ class LLMSettings(BaseSettings):
 class AppSettings(BaseSettings):
     """Main application settings"""
 
-    # Application
-    app_name: Annotated[
-        str,
-        Field(
-            default="Junjo Server",
-            description="Application name"
-        )
-    ]
-    debug: Annotated[
-        bool,
-        Field(
-            default=False,
-            description="Enable debug mode"
-        )
-    ]
-
     # Server
-    host: Annotated[
-        str,
-        Field(
-            default="0.0.0.0",
-            description="Server host"
-        )
-    ]
     port: Annotated[
         int,
         Field(
-            default=1324,
+            default=1323,
             ge=1,
             le=65535,
-            description="Server port (1324 for dev, 1323 for production)"
+            description="HTTP server port (internal container port, typically 1323)"
         )
     ]
 
@@ -314,6 +291,22 @@ class AppSettings(BaseSettings):
             ge=1,
             le=65535,
             description="gRPC server port for internal authentication (50053)"
+        )
+    ]
+
+    # Logging
+    log_level: Annotated[
+        str,
+        Field(
+            default="info",
+            description="Log level: debug, info, warn, error"
+        )
+    ]
+    log_format: Annotated[
+        str,
+        Field(
+            default="json",
+            description="Log format: json, text"
         )
     ]
 

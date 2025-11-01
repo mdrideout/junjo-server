@@ -19,7 +19,7 @@ from app.db_sqlite.users.schemas import (
     UserRead,
     UserResponse,
 )
-from app.features.auth.dependencies import CurrentUserEmail
+from app.features.auth.dependencies import CurrentUser
 from app.features.auth.service import AuthService
 
 router = APIRouter()
@@ -141,19 +141,19 @@ async def sign_out(request: Request):
 
 
 @router.get("/auth-test", response_model=AuthTestResponse)
-async def auth_test(current_user_email: CurrentUserEmail):
+async def auth_test(current_user: CurrentUser):
     """
     Test authentication by returning the current user email.
 
     Protected by auth dependency - will return 401 if not authenticated.
 
     Args:
-        current_user_email: Injected by CurrentUserEmail dependency
+        current_user: Injected by CurrentUser dependency
 
     Returns:
         AuthTestResponse with user email
     """
-    return AuthTestResponse(user_email=current_user_email.email)
+    return AuthTestResponse(user_email=current_user.email)
 
 
 # --- Protected Endpoints (auth required via dependency) ---
@@ -161,16 +161,16 @@ async def auth_test(current_user_email: CurrentUserEmail):
 
 @router.post("/users", response_model=UserResponse)
 async def create_user(
-    request: CreateUserRequest, authenticated_user: CurrentUserEmail
+    request: CreateUserRequest, authenticated_user: CurrentUser
 ):
     """
     Create a new user (auth required).
 
-    Uses CurrentUserEmail dependency for auth check.
+    Uses CurrentUser dependency for auth check.
 
     Args:
         request: CreateUserRequest with email and password
-        authenticated_user: Injected by CurrentUserEmail dependency
+        authenticated_user: Injected by CurrentUser dependency
 
     Returns:
         UserResponse with success message
@@ -192,14 +192,14 @@ async def create_user(
 
 
 @router.get("/users", response_model=list[UserRead])
-async def list_users(authenticated_user: CurrentUserEmail):
+async def list_users(authenticated_user: CurrentUser):
     """
     List all users (auth required).
 
-    Uses CurrentUserEmail dependency for auth check.
+    Uses CurrentUser dependency for auth check.
 
     Args:
-        authenticated_user: Injected by CurrentUserEmail dependency
+        authenticated_user: Injected by CurrentUser dependency
 
     Returns:
         List of UserRead objects
@@ -209,15 +209,15 @@ async def list_users(authenticated_user: CurrentUserEmail):
 
 
 @router.delete("/users/{user_id}", response_model=UserResponse)
-async def delete_user(user_id: str, authenticated_user: CurrentUserEmail):
+async def delete_user(user_id: str, authenticated_user: CurrentUser):
     """
     Delete a user (auth required).
 
-    Uses CurrentUserEmail dependency for auth check.
+    Uses CurrentUser dependency for auth check.
 
     Args:
         user_id: User ID to delete
-        authenticated_user: Injected by CurrentUserEmail dependency
+        authenticated_user: Injected by CurrentUser dependency
 
     Returns:
         UserResponse with success message

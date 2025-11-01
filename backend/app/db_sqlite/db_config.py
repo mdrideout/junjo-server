@@ -25,7 +25,7 @@ from app.config.settings import settings
 # Create the async engine
 engine = create_async_engine(
     settings.database.sqlite_url,
-    echo=settings.debug,  # Set to True to see SQL queries in debug mode
+    echo=False,  # Set to True manually if you need to see SQL queries for debugging
     connect_args={"check_same_thread": False},  # Required for async SQLite
 )
 

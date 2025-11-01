@@ -29,6 +29,26 @@ The `backend` service polls the `ingestion-service`'s internal gRPC API to read 
 
 ---
 
+## Deployment Requirements
+
+⚠️ **IMPORTANT**: The backend API and frontend **MUST be deployed on the same domain** (sharing the same registrable domain).
+
+**Supported configurations:**
+- ✅ `api.example.com` + `app.example.com` (subdomain + subdomain)
+- ✅ `api.example.com` + `example.com` (subdomain + apex)
+- ✅ `example.com` + `api.example.com` (apex + subdomain)
+- ❌ `app.example.com` + `service.run.app` (different domains - **will NOT work**)
+
+This requirement exists because the application uses session cookies with `SameSite=Strict` for security. Cross-domain deployments will not work - authentication will fail.
+
+**See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed setup instructions**, including:
+- Platform-specific examples (Google Cloud Run, AWS, Docker Compose)
+- Environment configuration
+- Security features
+- Troubleshooting guide
+
+---
+
 ## Turn-Key Example Repositories
 
 ### Junjo Server Bare Bones
