@@ -189,5 +189,5 @@ class LLMService:
             )
 
         except Exception as e:
-            logger.error(f"LiteLLM generation error: {e}", exc_info=True)
+            logger.error("LiteLLM generation error: {}", str(e), exc_info=True)
             raise

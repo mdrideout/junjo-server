@@ -45,7 +45,7 @@ async def generate(request: GenerateRequest, authenticated_user: CurrentUser):
         response = await LLMService.generate(request, authenticated_user)
         return response
     except Exception as e:
-        logger.error(f"Generation error: {e}", exc_info=True)
+        logger.error("Generation error: {}", str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Generation failed: {str(e)}"
         )
@@ -84,17 +84,17 @@ async def list_provider_models(provider: str, authenticated_user: CurrentUser):
         return ModelsResponse(models=models)
     except ValueError as e:
         # API key not configured
-        logger.error(f"Model discovery error for {provider}: {e}")
+        logger.error("Model discovery error for {}: {}", provider, str(e))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     except httpx.HTTPError as e:
         # Provider API failed
-        logger.error(f"Provider API error for {provider}: {e}")
+        logger.error("Provider API error for {}: {}", provider, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch models from {provider} API",
         )
     except Exception as e:
-        logger.error(f"Unexpected error fetching models for {provider}: {e}", exc_info=True)
+        logger.error("Unexpected error fetching models for {}: {}", provider, str(e), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
@@ -126,14 +126,14 @@ async def refresh_provider_models(provider: str, authenticated_user: CurrentUser
         models = await get_models_for_provider(provider, force_refresh=True)
         return ModelsResponse(models=models)
     except ValueError as e:
-        logger.error(f"Model refresh error for {provider}: {e}")
+        logger.error("Model refresh error for {}: {}", provider, str(e))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     except httpx.HTTPError as e:
-        logger.error(f"Provider API error for {provider}: {e}")
+        logger.error("Provider API error for {}: {}", provider, str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to refresh models from {provider} API",
         )
     except Exception as e:
-        logger.error(f"Unexpected error refreshing models for {provider}: {e}", exc_info=True)
+        logger.error("Unexpected error refreshing models for {}: {}", provider, str(e), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

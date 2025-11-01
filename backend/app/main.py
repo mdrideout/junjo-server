@@ -224,7 +224,7 @@ async def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
         version="0.1.0",
-        app_name=settings.app_name,
+        app_name="Junjo Server",
     )
 
 
