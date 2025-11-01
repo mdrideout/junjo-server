@@ -39,7 +39,11 @@ def get_connection():
         DuckDB handles concurrent reads/writes well (MVCC), so creating
         connections per-operation is acceptable for asyncio (single-threaded).
     """
-    conn = duckdb.connect(str(settings.database.duckdb_path))
+    # Ensure parent directory exists before connecting
+    db_path = Path(settings.database.duckdb_path).resolve()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = duckdb.connect(str(db_path))
     try:
         yield conn
     finally:

@@ -16,32 +16,30 @@ from app.proto_gen import auth_pb2, auth_pb2_grpc
 @pytest.mark.integration
 @pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
-async def test_validate_api_key_integration_with_production_key():
+async def test_validate_api_key_integration_with_production_key(test_api_key):
     """
-    Integration test: ValidateApiKey with a real API key from production database.
+    Integration test: ValidateApiKey with a real API key from database.
+
+    Uses the test_api_key fixture which automatically creates a test key
+    for the duration of the test module.
 
     Requires:
     - The gRPC server to be running on port 50053
-    - The production database to have at least one API key
-
-    To create a production key for testing:
-        python -c "from app.db_sqlite.api_keys.repository import APIKeyRepository; import asyncio, nanoid; asyncio.run(APIKeyRepository.create(id=nanoid.generate(size=21), key=nanoid.generate(size=64), name='Test Key'))"
     """
-    # This test specifically uses the production key created earlier:
-    # 9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz
-    production_test_key = "9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz"
+    # Use the test key provided by the fixture
+    test_key = test_api_key
 
-    # Connect to the gRPC server (uses production DB)
+    # Connect to the gRPC server
     async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
         stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
 
         # Make the ValidateApiKey request
-        request = auth_pb2.ValidateApiKeyRequest(api_key=production_test_key)
+        request = auth_pb2.ValidateApiKeyRequest(api_key=test_key)
         response = await stub.ValidateApiKey(request)
 
-        # Verify the response - should be valid since it exists in production DB
+        # Verify the response - should be valid since it exists in DB
         assert response.is_valid is True
-        logger.info("✓ Integration test passed: Production API key validated successfully")
+        logger.info("✓ Integration test passed: Test API key validated successfully")
 
 
 @pytest.mark.integration

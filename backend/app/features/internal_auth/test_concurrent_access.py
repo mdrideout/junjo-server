@@ -22,7 +22,7 @@ from app.proto_gen import auth_pb2, auth_pb2_grpc
 @pytest.mark.integration
 @pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
-async def test_concurrent_grpc_requests():
+async def test_concurrent_grpc_requests(test_api_key):
     """
     Test that multiple gRPC ValidateApiKey requests can be handled concurrently.
 
@@ -33,7 +33,7 @@ async def test_concurrent_grpc_requests():
     """
     num_requests = 50
     test_keys = [
-        "9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz",  # Valid
+        test_api_key,  # Valid (from fixture)
         "invalid_key_1",
         "invalid_key_2",
         "",
@@ -133,7 +133,7 @@ async def test_mixed_fastapi_and_grpc_requests():
 @pytest.mark.integration
 @pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
-async def test_grpc_under_load():
+async def test_grpc_under_load(test_api_key):
     """
     Test gRPC service under heavy concurrent load.
 
@@ -143,14 +143,14 @@ async def test_grpc_under_load():
     and doesn't have race conditions or deadlocks.
     """
     num_requests = 100
-    production_test_key = "9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz"
+    test_key = test_api_key
 
     async def validate_key() -> tuple[bool, float]:
         """Helper to validate key and measure response time."""
         start_time = asyncio.get_event_loop().time()
         async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
             stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
-            request = auth_pb2.ValidateApiKeyRequest(api_key=production_test_key)
+            request = auth_pb2.ValidateApiKeyRequest(api_key=test_key)
             response = await stub.ValidateApiKey(request)
             end_time = asyncio.get_event_loop().time()
             return response.is_valid, (end_time - start_time)
@@ -180,7 +180,7 @@ async def test_grpc_under_load():
 @pytest.mark.integration
 @pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
-async def test_database_isolation_concurrent_reads():
+async def test_database_isolation_concurrent_reads(test_api_key):
     """
     Test that concurrent database reads don't cause conflicts.
 
@@ -190,13 +190,13 @@ async def test_database_isolation_concurrent_reads():
     and there are no race conditions in concurrent reads.
     """
     num_concurrent_reads = 100
-    production_test_key = "9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz"
+    test_key = test_api_key
 
     async def read_key_via_grpc() -> bool:
         """Make a gRPC call which triggers a database read."""
         async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
             stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
-            request = auth_pb2.ValidateApiKeyRequest(api_key=production_test_key)
+            request = auth_pb2.ValidateApiKeyRequest(api_key=test_key)
             response = await stub.ValidateApiKey(request)
             return response.is_valid
 

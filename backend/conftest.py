@@ -16,14 +16,19 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
-# Set test database path BEFORE any app code gets imported
+# Set test database paths BEFORE any app code gets imported
 # This ensures db_config.py (which creates engine at import time) uses test location
-_test_base_dir = tempfile.mkdtemp(prefix="junjo_test_")
-os.environ["DB_SQLITE_PATH"] = f"{_test_base_dir}/production_stub.db"
+#
+# Note: If DB_SQLITE_PATH is already set (e.g., from shell for gRPC tests),
+# we respect that. Otherwise, create temp paths for unit/integration tests.
+if "DB_SQLITE_PATH" not in os.environ:
+    _test_base_dir = tempfile.mkdtemp(prefix="junjo_test_")
+    os.environ["DB_SQLITE_PATH"] = f"{_test_base_dir}/test.db"
+    os.environ["DB_DUCKDB_PATH"] = f"{_test_base_dir}/test.duckdb"
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def test_db():
+async def test_db(request):
     """Create test database in temporary directory for each test.
 
     Each test gets a completely isolated database file that is cleaned up after.
@@ -31,6 +36,11 @@ async def test_db():
     Yields:
         async_sessionmaker: Session factory for test database
     """
+    # Skip fixture for gRPC integration tests - they use the running server's DB
+    # (which also uses the temp path set above, ensuring isolation)
+    if "requires_grpc_server" in [marker.name for marker in request.node.iter_markers()]:
+        yield None
+        return
     # Import app code here (after env vars are set at module level)
     from app.db_sqlite import models  # noqa: F401
     from app.db_sqlite.base import Base
