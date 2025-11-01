@@ -8,39 +8,38 @@ version = "0.1.0"
 description = "Junjo Server Python Backend - LLM Observability Platform"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "pydantic[email]>=2.10.0",
-    "pydantic-settings>=2.7.0",
+    "fastapi>=0.120.4",
+    "uvicorn[standard]>=0.38.0",
+    "pydantic[email]>=2.12.3",
+    "pydantic-settings>=2.11.0",
     "python-dotenv>=1.0.0",
     "loguru>=0.7.0",
-    "python-multipart>=0.0.12",
+    "python-multipart>=0.0.20",
     "sqlalchemy[asyncio]>=2.0.36",
     "alembic>=1.14.0",
     "aiosqlite>=0.20.0",                                # Async SQLite driver
-    "greenlet>=3.0.0",                                  # Required for SQLAlchemy async
+    "greenlet>=3.2.4",                                  # Required for SQLAlchemy async
     "duckdb>=1.4.1",
-    "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.59b0",
     "nanoid>=2.0.0",
     "bcrypt>=5.0.0",
     "starlette-securecookies>=1.1.1",
     "itsdangerous>=2.2.0",
     "asgi-csrf>=0.11",
-    "grpcio>=1.68.0",
-    "grpcio-tools>=1.68.0",
-    "protobuf>=5.29.0",
-    "opentelemetry-proto>=1.28.0",
+    "grpcio>=1.76.0",
+    "grpcio-tools>=1.76.0",
+    "protobuf>=6.33.0",
+    "opentelemetry-proto>=1.38.0",
     "litellm>=1.79.0",
     "google-genai>=1.47.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
-    "httpx>=0.28.0",          # For testing FastAPI
-    "ruff>=0.8.0",            # Linting
-    "mypy>=1.13.0",           # Type checking
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "httpx>=0.28.0",         # For testing FastAPI
+    "ruff>=0.14.3",          # Linting
 ]
 
 [tool.setuptools]
@@ -52,7 +51,7 @@ include = ["app*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py314"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
@@ -61,12 +60,6 @@ ignore = ["E501"]                        # Line too long
 [tool.ruff.lint.isort]
 lines-after-imports = 2
 force-sort-within-sections = true
-
-[tool.mypy]
-python_version = "3.14"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

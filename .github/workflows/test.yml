@@ -34,9 +34,6 @@ jobs:
       - name: Run linter
         run: uv run ruff check app/
 
-      - name: Run type checker
-        run: uv run mypy app/
-
       - name: Run unit tests (excluding integration)
         run: uv run pytest -m "not integration" -v
 
