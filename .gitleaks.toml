@@ -24,10 +24,8 @@ regexes = [
     '''production_test_key''',  # Test key variable names
 ]
 
-# Allowlist by commit message patterns
-[allowlist.commits]
-# Allow commits that explicitly mention test fixtures
-regexes = [
+# Allowlist by commit message patterns (array of strings)
+commits = [
     '''test.*fixture''',
     '''test.*data''',
 ]
