@@ -197,8 +197,8 @@ def get_workflow_spans(service_name: str, limit: int = 500) -> list[dict]:
             """
             SELECT
                 trace_id, span_id, parent_span_id, service_name, name, kind,
-                strftime(start_time, '%Y-%m-%dT%H:%M:%S.%f%z') as start_time,
-                strftime(end_time, '%Y-%m-%dT%H:%M:%S.%f%z') as end_time,
+                strftime(start_time, '%Y-%m-%dT%H:%M:%S.%f') || '+00:00' as start_time,
+                strftime(end_time, '%Y-%m-%dT%H:%M:%S.%f') || '+00:00' as end_time,
                 status_code, status_message, attributes_json, events_json, links_json,
                 trace_flags, trace_state,
                 junjo_id, junjo_parent_id, junjo_span_type,
