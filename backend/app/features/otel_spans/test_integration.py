@@ -4,7 +4,6 @@ Tests end-to-end workflows: ingestion → storage → HTTP API retrieval.
 Uses FastAPI TestClient for real HTTP requests against the API endpoints.
 """
 
-
 from fastapi.testclient import TestClient
 from opentelemetry.proto.common.v1 import common_pb2
 from opentelemetry.proto.trace.v1 import trace_pb2
@@ -76,9 +75,7 @@ def create_workflow_span():
 
         # Junjo custom attributes
         span.attributes.append(
-            common_pb2.KeyValue(
-                key="junjo.id", value=common_pb2.AnyValue(string_value=junjo_id)
-            )
+            common_pb2.KeyValue(key="junjo.id", value=common_pb2.AnyValue(string_value=junjo_id))
         )
         span.attributes.append(
             common_pb2.KeyValue(
@@ -113,9 +110,7 @@ def create_workflow_span():
 
         # Additional OTLP attributes (should be filtered to attributes_json)
         span.attributes.append(
-            common_pb2.KeyValue(
-                key="http.method", value=common_pb2.AnyValue(string_value="POST")
-            )
+            common_pb2.KeyValue(key="http.method", value=common_pb2.AnyValue(string_value="POST"))
         )
 
         return span
@@ -310,18 +305,30 @@ class TestAPIEndpoints:
         expected = {f"{i:016x}" for i in range(5, 10)}  # IDs 5-9 (most recent)
         assert span_ids == expected
 
-    def test_get_root_spans_filters_correctly(self, api_client, create_workflow_span, create_node_span):
+    def test_get_root_spans_filters_correctly(
+        self, api_client, create_workflow_span, create_node_span
+    ):
         """Verify /spans/root only returns spans with parent_span_id=NULL."""
         trace_id = "aaaaaaaabbbbbbbbccccccccdddddddd"
 
         # Insert 2 root spans
-        root1 = create_workflow_span(trace_id=trace_id, span_id="aaaa000000000001", junjo_id="root1")
-        root2 = create_workflow_span(trace_id=trace_id, span_id="aaaa000000000002", junjo_id="root2")
+        root1 = create_workflow_span(
+            trace_id=trace_id, span_id="aaaa000000000001", junjo_id="root1"
+        )
+        root2 = create_workflow_span(
+            trace_id=trace_id, span_id="aaaa000000000002", junjo_id="root2"
+        )
 
         # Insert 3 child spans
-        child1 = create_node_span(trace_id=trace_id, span_id="bbbb000000000001", parent_span_id="aaaa000000000001")
-        child2 = create_node_span(trace_id=trace_id, span_id="bbbb000000000002", parent_span_id="aaaa000000000001")
-        child3 = create_node_span(trace_id=trace_id, span_id="bbbb000000000003", parent_span_id="aaaa000000000002")
+        child1 = create_node_span(
+            trace_id=trace_id, span_id="bbbb000000000001", parent_span_id="aaaa000000000001"
+        )
+        child2 = create_node_span(
+            trace_id=trace_id, span_id="bbbb000000000002", parent_span_id="aaaa000000000001"
+        )
+        child3 = create_node_span(
+            trace_id=trace_id, span_id="bbbb000000000003", parent_span_id="aaaa000000000002"
+        )
 
         process_span_batch("my-service", [root1, root2, child1, child2, child3])
 
@@ -363,14 +370,18 @@ class TestAPIEndpoints:
         process_span_batch("my-service", [span_with_llm, span_no_llm])
 
         # Query with has_llm=true
-        response = api_client.get("/api/v1/observability/services/my-service/spans/root?has_llm=true")
+        response = api_client.get(
+            "/api/v1/observability/services/my-service/spans/root?has_llm=true"
+        )
         assert response.status_code == 200
 
         llm_roots = response.json()
         assert len(llm_roots) == 1
         assert llm_roots[0]["span_id"] == "1111222233334444"
 
-    def test_get_workflow_spans_filters_by_type(self, api_client, create_workflow_span, create_node_span):
+    def test_get_workflow_spans_filters_by_type(
+        self, api_client, create_workflow_span, create_node_span
+    ):
         """Verify /workflows only returns junjo_span_type='workflow'."""
         # Insert 2 workflow spans
         wf1 = create_workflow_span(trace_id="1" * 32, span_id="1111" + "0" * 12, junjo_id="wf1")
@@ -505,7 +516,7 @@ class TestDataIntegrity:
             common_pb2.KeyValue(key="int_attr", value=common_pb2.AnyValue(int_value=42))
         )
         span.attributes.append(
-            common_pb2.KeyValue(key="double_attr", value=common_pb2.AnyValue(double_value=3.14))
+            common_pb2.KeyValue(key="double_attr", value=common_pb2.AnyValue(double_value=3.13))
         )
         span.attributes.append(
             common_pb2.KeyValue(key="bool_attr", value=common_pb2.AnyValue(bool_value=True))
@@ -516,7 +527,9 @@ class TestDataIntegrity:
         event.name = "test_event"
         event.time_unix_nano = 1699876543500000000
         event.attributes.append(
-            common_pb2.KeyValue(key="event_key", value=common_pb2.AnyValue(string_value="event_value"))
+            common_pb2.KeyValue(
+                key="event_key", value=common_pb2.AnyValue(string_value="event_value")
+            )
         )
         span.events.append(event)
 
@@ -532,7 +545,7 @@ class TestDataIntegrity:
         assert isinstance(result["attributes_json"], dict)
         assert result["attributes_json"]["string_attr"] == "test"
         assert result["attributes_json"]["int_attr"] == 42
-        assert result["attributes_json"]["double_attr"] == 3.14
+        assert result["attributes_json"]["double_attr"] == 3.13
         assert result["attributes_json"]["bool_attr"] is True
 
         # Verify events_json is valid JSON list

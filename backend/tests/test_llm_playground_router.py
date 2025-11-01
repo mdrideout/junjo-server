@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, patch
 
 import httpx
-import pytest
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from app.features.llm_playground.models import models_cache
 from app.features.llm_playground.schemas import ModelInfo

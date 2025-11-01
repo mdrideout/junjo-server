@@ -6,8 +6,8 @@ properly rejects unauthorized access attempts.
 
 import asyncio
 
-import pytest
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from app.main import app
 

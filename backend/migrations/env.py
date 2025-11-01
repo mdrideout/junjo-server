@@ -26,6 +26,7 @@ from app.db_sqlite.base import Base
 # Add new models here as they are created
 from app.db_sqlite.users.models import UserTable  # noqa: F401
 
+
 # Future models:
 # from app.database.api_keys.models import APIKeyTable  # noqa: F401
 

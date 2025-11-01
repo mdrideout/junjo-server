@@ -7,8 +7,8 @@ connection errors, transaction failures, and recovery scenarios.
 import asyncio
 from unittest.mock import patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
+import pytest
 from sqlalchemy.exc import OperationalError
 
 from app.db_sqlite.api_keys.repository import APIKeyRepository

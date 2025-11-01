@@ -3,8 +3,8 @@
 Only tests custom validation logic - basic Pydantic behavior is tested by the framework.
 """
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from app.features.llm_playground.schemas import GenerateRequest, Message
 

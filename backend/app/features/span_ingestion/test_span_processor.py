@@ -60,9 +60,7 @@ class TestOTLPTypeConversions:
                 key="service.name",
                 value=common_pb2.AnyValue(string_value="my-service"),
             ),
-            common_pb2.KeyValue(
-                key="http.method", value=common_pb2.AnyValue(string_value="GET")
-            ),
+            common_pb2.KeyValue(key="http.method", value=common_pb2.AnyValue(string_value="GET")),
         ]
 
         assert extract_string_attribute(attributes, "service.name") == "my-service"
@@ -85,21 +83,13 @@ class TestOTLPTypeConversions:
         """Test conversion of all 6 OTLP attribute types to JSON."""
         attributes = [
             # StringValue
-            common_pb2.KeyValue(
-                key="string.attr", value=common_pb2.AnyValue(string_value="hello")
-            ),
+            common_pb2.KeyValue(key="string.attr", value=common_pb2.AnyValue(string_value="hello")),
             # IntValue
-            common_pb2.KeyValue(
-                key="int.attr", value=common_pb2.AnyValue(int_value=42)
-            ),
+            common_pb2.KeyValue(key="int.attr", value=common_pb2.AnyValue(int_value=42)),
             # DoubleValue
-            common_pb2.KeyValue(
-                key="double.attr", value=common_pb2.AnyValue(double_value=3.14)
-            ),
+            common_pb2.KeyValue(key="double.attr", value=common_pb2.AnyValue(double_value=3.13)),
             # BoolValue
-            common_pb2.KeyValue(
-                key="bool.attr", value=common_pb2.AnyValue(bool_value=True)
-            ),
+            common_pb2.KeyValue(key="bool.attr", value=common_pb2.AnyValue(bool_value=True)),
             # ArrayValue
             common_pb2.KeyValue(
                 key="array.attr",
@@ -131,9 +121,7 @@ class TestOTLPTypeConversions:
                 ),
             ),
             # BytesValue
-            common_pb2.KeyValue(
-                key="bytes.attr", value=common_pb2.AnyValue(bytes_value=b"Hello")
-            ),
+            common_pb2.KeyValue(key="bytes.attr", value=common_pb2.AnyValue(bytes_value=b"Hello")),
         ]
 
         result = convert_attributes_to_json(attributes)
@@ -143,7 +131,7 @@ class TestOTLPTypeConversions:
 
         assert data["string.attr"] == "hello"
         assert data["int.attr"] == 42
-        assert data["double.attr"] == 3.14
+        assert data["double.attr"] == 3.13
         assert data["bool.attr"] is True
         assert data["array.attr"] == ["a", 1, False]
         assert data["kvlist.attr"] == {"nested.string": "value", "nested.int": 10}
@@ -194,18 +182,12 @@ class TestOTLPTypeConversions:
     def test_filter_junjo_attributes(self):
         """Test filtering of Junjo dedicated-column attributes."""
         attributes = [
-            common_pb2.KeyValue(
-                key="http.method", value=common_pb2.AnyValue(string_value="GET")
-            ),
-            common_pb2.KeyValue(
-                key="junjo.id", value=common_pb2.AnyValue(string_value="wf-123")
-            ),
+            common_pb2.KeyValue(key="http.method", value=common_pb2.AnyValue(string_value="GET")),
+            common_pb2.KeyValue(key="junjo.id", value=common_pb2.AnyValue(string_value="wf-123")),
             common_pb2.KeyValue(
                 key="junjo.span_type", value=common_pb2.AnyValue(string_value="workflow")
             ),
-            common_pb2.KeyValue(
-                key="http.status_code", value=common_pb2.AnyValue(int_value=200)
-            ),
+            common_pb2.KeyValue(key="http.status_code", value=common_pb2.AnyValue(int_value=200)),
         ]
 
         filtered = filter_junjo_attributes(attributes)
@@ -252,21 +234,15 @@ class TestSpanProcessorIntegration:
 
         # Standard OTel attributes
         span.attributes.append(
-            common_pb2.KeyValue(
-                key="http.method", value=common_pb2.AnyValue(string_value="POST")
-            )
+            common_pb2.KeyValue(key="http.method", value=common_pb2.AnyValue(string_value="POST"))
         )
 
         # Junjo custom attributes
         span.attributes.append(
-            common_pb2.KeyValue(
-                key="junjo.id", value=common_pb2.AnyValue(string_value="wf-abc123")
-            )
+            common_pb2.KeyValue(key="junjo.id", value=common_pb2.AnyValue(string_value="wf-abc123"))
         )
         span.attributes.append(
-            common_pb2.KeyValue(
-                key="junjo.parent_id", value=common_pb2.AnyValue(string_value="")
-            )
+            common_pb2.KeyValue(key="junjo.parent_id", value=common_pb2.AnyValue(string_value=""))
         )
         span.attributes.append(
             common_pb2.KeyValue(
@@ -288,9 +264,7 @@ class TestSpanProcessorIntegration:
         span.attributes.append(
             common_pb2.KeyValue(
                 key="junjo.workflow.graph_structure",
-                value=common_pb2.AnyValue(
-                    string_value='{"nodes": ["start", "process", "end"]}'
-                ),
+                value=common_pb2.AnyValue(string_value='{"nodes": ["start", "process", "end"]}'),
             )
         )
         span.attributes.append(

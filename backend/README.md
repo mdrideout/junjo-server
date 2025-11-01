@@ -4,7 +4,7 @@ Python/FastAPI backend for the Junjo Server LLM observability platform.
 
 ## Technology Stack
 
-- **Python 3.14+** (latest stable)
+- **Python 3.13+** (latest stable)
 - **FastAPI** (async web framework)
 - **Pydantic v2+** (data validation and settings)
 - **Loguru** (structured logging)
@@ -14,7 +14,7 @@ Python/FastAPI backend for the Junjo Server LLM observability platform.
 
 ### Prerequisites
 
-- Python 3.14+
+- Python 3.13+
 - [uv](https://github.com/astral-sh/uv) (recommended)
 
 ### Installation
@@ -22,6 +22,9 @@ Python/FastAPI backend for the Junjo Server LLM observability platform.
 ```bash
 # Navigate to backend directory
 cd backend_python
+
+# Create virtual environment with Python 3.13
+uv venv --python 3.13
 
 # Install dependencies including dev tools (pytest, ruff, mypy)
 uv sync --all-extras
@@ -292,8 +295,9 @@ PYTHONPATH=. uv run uvicorn app.main:app --reload
 ### Virtual Environment Issues
 
 ```bash
-# Remove existing venv and reinstall
+# Remove existing venv and recreate with Python 3.13
 rm -rf .venv
+uv venv --python 3.13
 uv sync
 ```
 

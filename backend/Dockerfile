@@ -1,5 +1,5 @@
 # Stage 1: Base - Install dependencies using uv
-FROM python:3.14-alpine AS base
+FROM python:3.13-alpine AS base
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
 
 # Stage 2: Production - Final image
-FROM python:3.14-alpine AS production
+FROM python:3.13-alpine AS production
 
 # Install tini for proper signal handling and libstdc++ for greenlet
 RUN apk add --no-cache tini libstdc++
