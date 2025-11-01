@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"encoding/hex"
-	"log"
+	"log/slog"
 
 	"junjo-server/ingestion-service/storage"
 
@@ -29,11 +29,11 @@ func (s *OtelTraceService) Export(ctx context.Context, req *coltracepb.ExportTra
 			for _, span := range scopeSpans.Spans {
 				traceID := hex.EncodeToString(span.TraceId)
 				spanID := hex.EncodeToString(span.SpanId)
-				log.Printf("Received Span ID: %s, Trace ID: %s, Name: %s", spanID, traceID, span.Name)
+				slog.InfoContext(ctx, "received span", slog.String("span_id", spanID), slog.String("trace_id", traceID), slog.String("name", span.Name))
 
 				// Write the span to the WAL
 				if err := s.store.WriteSpan(span, resource); err != nil {
-					log.Printf("Error writing span to WAL: %v", err)
+					slog.ErrorContext(ctx, "error writing span to wal", slog.Any("error", err))
 					// Decide on error handling: continue, or return an error to the client?
 					// For a WAL, we generally want to be resilient, so we'll log and continue.
 				}

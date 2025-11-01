@@ -2,20 +2,22 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
 	"junjo-server/ingestion-service/backend_client"
+	"junjo-server/ingestion-service/logger"
 	"junjo-server/ingestion-service/server"
 	"junjo-server/ingestion-service/storage"
 )
 
 func main() {
-	fmt.Println("Starting ingestion service...")
+	// Initialize logger
+	log := logger.InitLogger()
+	log.Info("starting ingestion service")
 
 	// --- BadgerDB Setup ---
 	dbPath := os.Getenv("BADGERDB_PATH")
@@ -23,24 +25,27 @@ func main() {
 		// Default to a local directory for development
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			log.Fatalf("Failed to get user home directory: %v", err)
+			log.Error("failed to get user home directory", slog.Any("error", err))
+			os.Exit(1)
 		}
 		dbPath = filepath.Join(homeDir, ".junjo", "ingestion-wal")
 	}
 
 	// Ensure the directory exists
 	if err := os.MkdirAll(dbPath, 0755); err != nil {
-		log.Fatalf("Failed to create database directory at %s: %v", dbPath, err)
+		log.Error("failed to create database directory", slog.String("path", dbPath), slog.Any("error", err))
+		os.Exit(1)
 	}
 
-	log.Printf("Initializing BadgerDB at: %s", dbPath)
+	log.Info("initializing badgerdb", slog.String("path", dbPath))
 	store, err := storage.NewStorage(dbPath)
 	if err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
+		log.Error("failed to initialize storage", slog.Any("error", err))
+		os.Exit(1)
 	}
 	// We will call Close() explicitly in the shutdown block.
 
-	log.Println("Storage initialized successfully.")
+	log.Info("storage initialized successfully")
 
 	// --- Dependency Injection Setup ---
 	// The main function acts as the injector, creating and wiring together the
@@ -50,7 +55,8 @@ func main() {
 	//    the backend's internal authentication service.
 	authClient, err := backend_client.NewAuthClient()
 	if err != nil {
-		log.Fatalf("Failed to create backend auth client: %v", err)
+		log.Error("failed to create backend auth client", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer authClient.Close()
 
@@ -59,36 +65,41 @@ func main() {
 	//    preventing the startup race condition where the ingestion service starts
 	//    before the backend's gRPC server is ready.
 	//    We wait indefinitely since the ingestion service cannot function without the backend.
-	log.Println("Waiting for backend to be ready (no timeout - will wait indefinitely)...")
+	log.Info("waiting for backend to be ready")
 	if err := authClient.WaitUntilReady(context.Background()); err != nil {
-		log.Fatalf("Backend connection failed: %v", err)
+		log.Error("backend connection failed", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// 3. Create the Public gRPC Server: This server handles all incoming public
 	//    requests. It is injected with the components it depends on, such as the
 	//    storage layer and the AuthClient.
-	publicGRPCServer, publicLis, err := server.NewGRPCServer(store, authClient)
+	publicGRPCServer, publicLis, err := server.NewGRPCServer(store, authClient, log)
 	if err != nil {
-		log.Fatalf("Failed to create public gRPC server: %v", err)
+		log.Error("failed to create public grpc server", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	go func() {
-		log.Printf("Public gRPC server listening at %v", publicLis.Addr())
+		log.Info("public grpc server listening", slog.String("address", publicLis.Addr().String()))
 		if err := publicGRPCServer.Serve(publicLis); err != nil {
-			log.Fatalf("Failed to serve public gRPC: %v", err)
+			log.Error("failed to serve public grpc", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}()
 
 	// --- Internal gRPC Server Setup ---
-	internalGRPCServer, internalLis, err := server.NewInternalGRPCServer(store)
+	internalGRPCServer, internalLis, err := server.NewInternalGRPCServer(store, log)
 	if err != nil {
-		log.Fatalf("Failed to create internal gRPC server: %v", err)
+		log.Error("failed to create internal grpc server", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	go func() {
-		log.Printf("Internal gRPC server listening at %v", internalLis.Addr())
+		log.Info("internal grpc server listening", slog.String("address", internalLis.Addr().String()))
 		if err := internalGRPCServer.Serve(internalLis); err != nil {
-			log.Fatalf("Failed to serve internal gRPC: %v", err)
+			log.Error("failed to serve internal grpc", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}()
 
@@ -97,22 +108,23 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit // Block until a signal is received.
 
-	log.Println("Shutting down gRPC servers...")
+	log.Info("shutting down grpc servers")
 	publicGRPCServer.GracefulStop()
 	internalGRPCServer.GracefulStop()
-	log.Println("gRPC servers stopped.")
+	log.Info("grpc servers stopped")
 
-	log.Println("Attempting to sync database to disk...")
+	log.Info("syncing database to disk")
 	if err := store.Sync(); err != nil {
 		// Log this as a warning, but still attempt to close.
-		log.Printf("Warning: failed to sync database: %v", err)
+		log.Warn("failed to sync database", slog.Any("error", err))
 	} else {
-		log.Println("Database sync completed successfully.")
+		log.Info("database sync completed")
 	}
 
-	log.Println("Attempting to close database...")
+	log.Info("closing database")
 	if err := store.Close(); err != nil {
-		log.Fatalf("FATAL: Failed to close database: %v", err)
+		log.Error("failed to close database", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Println("Database closed successfully.")
+	log.Info("database closed successfully")
 }

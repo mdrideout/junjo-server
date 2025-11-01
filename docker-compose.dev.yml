@@ -1,0 +1,64 @@
+services:
+  junjo-server-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "1323:1323"
+    env_file:
+      - .env
+    environment:
+      # Development mode
+      - DEBUG=true
+      # Override host/port for Docker network communication
+      - INGESTION_HOST=junjo-server-ingestion
+      - INGESTION_PORT=50052
+      # Enable migrations on startup
+      - RUN_MIGRATIONS=true
+      # All other vars inherited from .env (secrets, API keys, DB paths, etc.)
+    volumes:
+      - ./.dbdata:/dbdata
+      - ./backend/app:/app/app
+    networks:
+      - junjo-network
+
+  junjo-server-ingestion:
+    build:
+      context: ./ingestion-service
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+      - "50052:50052"
+    env_file:
+      - .env
+    environment:
+      # Override host/port for Docker network communication
+      - BACKEND_GRPC_HOST=junjo-server-backend
+      - BACKEND_GRPC_PORT=50053
+      # BADGERDB_PATH inherited from .env
+    volumes:
+      - ./.dbdata/badgerdb:/dbdata/badgerdb
+    depends_on:
+      - junjo-server-backend
+    networks:
+      - junjo-network
+
+  junjo-server-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5151:80"
+    env_file:
+      - .env
+    environment:
+      # Frontend-specific config
+      - VITE_API_URL=http://localhost:1323
+    networks:
+      - junjo-network
+
+networks:
+  junjo-network:
+    driver: bridge

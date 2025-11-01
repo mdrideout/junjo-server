@@ -16,12 +16,15 @@ RUN apk add --no-cache curl && \
     chmod +x /usr/local/bin/grpc_health_probe && \
     apk del curl
 
+# Copy shared proto files
+COPY proto/ ../proto/
+
 # Copy Go module files and download dependencies
-COPY go.mod go.sum ./
+COPY ingestion-service/go.mod ingestion-service/go.sum ./
 RUN go mod download
 
 # Copy the rest of the application source code
-COPY . .
+COPY ingestion-service/ .
 
 # Expose the gRPC port
 EXPOSE 50051
@@ -37,12 +40,15 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
+# Copy shared proto files
+COPY proto/ ../proto/
+
 # Copy Go module files and download dependencies
-COPY go.mod go.sum ./
+COPY ingestion-service/go.mod ingestion-service/go.sum ./
 RUN go mod download
 
 # Copy the rest of the application source code
-COPY . .
+COPY ingestion-service/ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o /ingestion-service

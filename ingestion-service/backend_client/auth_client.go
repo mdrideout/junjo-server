@@ -3,9 +3,11 @@ package backend_client
 import (
 	"context"
 	"fmt"
-	pb "junjo-server/ingestion-service/proto_gen"
-	"log"
+	"log/slog"
+	"os"
 	"time"
+
+	pb "junjo-server/ingestion-service/proto_gen"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,7 +22,19 @@ type AuthClient struct {
 // NewAuthClient creates a new gRPC client for the backend's auth service.
 // The connection will automatically reconnect if the backend becomes unavailable.
 func NewAuthClient() (*AuthClient, error) {
-	addr := "junjo-server-backend:50053"
+	// Read backend host and port from environment variables
+	// Defaults to old Go backend for backward compatibility
+	host := os.Getenv("BACKEND_GRPC_HOST")
+	if host == "" {
+		host = "junjo-server-backend" // Default to old Go backend
+	}
+
+	port := os.Getenv("BACKEND_GRPC_PORT")
+	if port == "" {
+		port = "50053" // Default port
+	}
+
+	addr := fmt.Sprintf("%s:%s", host, port)
 
 	// Create a persistent gRPC connection.
 	// gRPC automatically manages connection state and reconnects if the backend restarts.
@@ -34,7 +48,7 @@ func NewAuthClient() (*AuthClient, error) {
 		return nil, err
 	}
 
-	log.Printf("Created gRPC client for backend auth service at %s", addr)
+	slog.Info("created grpc client for backend auth", slog.String("address", addr))
 
 	return &AuthClient{
 		conn:   conn,
@@ -69,7 +83,7 @@ func (c *AuthClient) ValidateApiKey(ctx context.Context, apiKey string) (bool, e
 		grpc.WaitForReady(true), // Wait for backend to be ready, but respect timeout
 	)
 	if err != nil {
-		log.Printf("Failed to validate API key with backend: %v", err)
+		slog.Error("failed to validate api key with backend", slog.Any("error", err))
 		return false, fmt.Errorf("backend validation failed: %w", err)
 	}
 
@@ -80,7 +94,7 @@ func (c *AuthClient) ValidateApiKey(ctx context.Context, apiKey string) (bool, e
 // This should be called once at startup to ensure the backend is ready before
 // accepting traffic.
 func (c *AuthClient) WaitUntilReady(ctx context.Context) error {
-	log.Println("Waiting for backend gRPC server to be ready...")
+	slog.Info("waiting for backend grpc server to be ready")
 
 	// Try to validate a dummy key - we don't care about the result,
 	// just that the backend responds
@@ -97,6 +111,6 @@ func (c *AuthClient) WaitUntilReady(ctx context.Context) error {
 		return fmt.Errorf("backend did not become ready: %w", err)
 	}
 
-	log.Println("Backend gRPC server is ready!")
+	slog.Info("backend grpc server is ready")
 	return nil
 }

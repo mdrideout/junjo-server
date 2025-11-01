@@ -2,7 +2,7 @@ package storage
 
 import (
 	"crypto/rand"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -54,19 +54,19 @@ func NewStorage(path string) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("BadgerDB opened successfully at path: %s", path)
+	slog.Info("badgerdb opened", slog.String("path", path))
 	return &Storage{db: db}, nil
 }
 
 // Close safely closes the BadgerDB connection.
 func (s *Storage) Close() error {
-	log.Println("Closing BadgerDB...")
+	slog.Info("closing badgerdb")
 	return s.db.Close()
 }
 
 // Sync flushes all pending writes to disk.
 func (s *Storage) Sync() error {
-	log.Println("Syncing BadgerDB to disk...")
+	slog.Info("syncing badgerdb to disk")
 	return s.db.Sync()
 }
 
@@ -134,7 +134,7 @@ func (s *Storage) ReadSpans(startKey []byte, batchSize uint32, sendFunc func(key
 			// Unmarshal the value to SpanData
 			spanData, err := UnmarshalSpanData(val)
 			if err != nil {
-				log.Printf("Error unmarshaling span data: %v", err)
+				slog.Warn("error unmarshaling span data", slog.Any("error", err))
 				// Skip corrupted data
 				count++
 				it.Next()
@@ -144,14 +144,14 @@ func (s *Storage) ReadSpans(startKey []byte, batchSize uint32, sendFunc func(key
 			// Marshal the span and resource back to bytes for sending
 			spanBytes, err := proto.Marshal(spanData.Span)
 			if err != nil {
-				log.Printf("Error marshaling span: %v", err)
+				slog.Warn("error marshaling span", slog.Any("error", err))
 				count++
 				it.Next()
 				continue
 			}
 			resourceBytes, err := proto.Marshal(spanData.Resource)
 			if err != nil {
-				log.Printf("Error marshaling resource: %v", err)
+				slog.Warn("error marshaling resource", slog.Any("error", err))
 				count++
 				it.Next()
 				continue

@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	colmetricpb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 )
@@ -19,6 +19,6 @@ func NewOtelMetricService() *OtelMetricService {
 func (s *OtelMetricService) Export(ctx context.Context, req *colmetricpb.ExportMetricsServiceRequest) (*colmetricpb.ExportMetricsServiceResponse, error) {
 	// For now, we just log that we received metrics.
 	// In the future, these could also be written to the WAL.
-	log.Printf("Received %d resource metrics", len(req.ResourceMetrics))
+	slog.InfoContext(ctx, "received resource metrics", slog.Int("count", len(req.ResourceMetrics)))
 	return &colmetricpb.ExportMetricsServiceResponse{}, nil
 }

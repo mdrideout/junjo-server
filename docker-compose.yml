@@ -3,21 +3,25 @@ services:
     container_name: junjo-server-backend
     restart: unless-stopped
     build:
-      context: ./backend
-      target: ${JUNJO_BUILD_TARGET:-production} # Default to 'production', set to "development" for local air hot-reloading
+      context: .
+      dockerfile: backend/Dockerfile
     volumes:
-      - ./backend:/app # Mount the backend code for hot reloading
-      - ./.dbdata/sqlite:/dbdata/sqlite # SQLite storage
-      - ./.dbdata/duckdb:/dbdata/duckdb # DuckDB storage
+      - ./.dbdata:/app/.dbdata
     ports:
-      - "1323:1323" # Public API server port for Junjo UX
-      - "50053:50053" # Internal gRPC server port
+      - "1323:1323"
     networks:
       - junjo-network
     env_file:
       - .env
+    environment:
+      # Override host/port for Docker network communication
+      - INGESTION_HOST=junjo-server-ingestion
+      - INGESTION_PORT=50052
+      # Enable migrations on startup
+      - RUN_MIGRATIONS=true
+      # DB paths inherited from .env (DB_SQLITE_PATH, DB_DUCKDB_PATH)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1323/ping"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:1323/ping')"]
       interval: 5s
       timeout: 3s
       retries: 25
@@ -27,21 +31,25 @@ services:
     container_name: junjo-server-ingestion
     restart: unless-stopped
     build:
-      context: ./ingestion-service
+      context: .
+      dockerfile: ingestion-service/Dockerfile
       target: ${JUNJO_BUILD_TARGET:-production}
     volumes:
       - ./ingestion-service:/app
-      - ./.dbdata/badgerdb:/dbdata/badgerdb # BadgerDB storage
+      - ./.dbdata:/app/.dbdata
     ports:
-      - "50051:50051" # Public gRPC telemetry server port for Junjo SDK Otel Exporter
-      - "50052:50052" # Internal gRPC server port
+      - "50051:50051"
+      - "50052:50052"
     networks:
       - junjo-network
     env_file:
       - .env
+    environment:
+      - BACKEND_GRPC_HOST=junjo-server-backend
+      - BACKEND_GRPC_PORT=50053
     depends_on:
       junjo-server-backend:
-        condition: service_healthy # Wait for backend HTTP server to be healthy before starting
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=localhost:50052"]
       interval: 5s
@@ -53,26 +61,26 @@ services:
     container_name: junjo-server-frontend
     restart: unless-stopped
     build:
-      context: ./frontend
-      target: ${JUNJO_BUILD_TARGET:-production} # Default to 'production', set to "development" for local air hot-reloading
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: ${JUNJO_BUILD_TARGET:-production}
     volumes:
-      - frontend-modules:/app/node_modules # Dev only: Named volume for node_modules
-      - ./frontend:/app # Dev only: Mount the frontend code for hot reloading
+      - frontend-modules:/app/node_modules
+      - ./frontend:/app
     ports:
-      # Development ports (Vite)
-      - "5151:5151" # Vite server
-      - "5152:5151" # Vite hmr (map hmr port to host port)
-      - "5153:80" # Production port to web server mapping
+      - "5151:5151"
+      - "5152:5151"
+      - "5153:80"
     env_file:
       - .env
     depends_on:
       junjo-server-backend:
-        condition: service_healthy # Wait for junjo-server-backend to be healthy before starting junjo-server-frontend
+        condition: service_healthy
       junjo-server-ingestion:
         condition: service_healthy
 
 volumes:
-  frontend-modules: # Dev only: Named volume for node_modules
+  frontend-modules:
 
 networks:
   junjo-network:
