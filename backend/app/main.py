@@ -157,11 +157,11 @@ app.add_middleware(
 # Outgoing:  request.session modified → SessionMiddleware (sign) → SecureCookiesMiddleware (encrypt) → Browser
 
 # === ROUTERS ===
-app.include_router(auth_router.router, tags=["auth"])
-app.include_router(api_keys_router.router)
-app.include_router(llm_playground_router.router, prefix="/llm", tags=["llm"])
+app.include_router(auth_router, tags=["auth"])
+app.include_router(api_keys_router)
+app.include_router(llm_playground_router, prefix="/llm", tags=["llm"])
 app.include_router(
-    otel_spans_router.router, prefix="/api/v1/observability", tags=["observability"]
+    otel_spans_router, prefix="/api/v1/observability", tags=["observability"]
 )
 
 

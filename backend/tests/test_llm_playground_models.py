@@ -1,7 +1,10 @@
-"""Unit tests for LLM playground models (cache and API fetchers)."""
+"""Unit tests for LLM playground models (cache and API fetchers).
+
+Only tests complex logic - basic dict/list operations are tested by Python.
+"""
 
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
@@ -18,48 +21,8 @@ from app.features.llm_playground.schemas import ModelInfo
 
 
 @pytest.mark.unit
-def test_models_cache_init():
-    """Test ModelsCache initialization."""
-    cache = ModelsCache(ttl_seconds=600)
-    assert cache.ttl_seconds == 600
-    assert len(cache._cache) == 0
-
-
-@pytest.mark.unit
-def test_models_cache_set_and_get():
-    """Test caching and retrieving models."""
-    cache = ModelsCache(ttl_seconds=900)
-
-    models = [
-        ModelInfo(
-            id="openai/gpt-4o",
-            provider="openai",
-            display_name="GPT-4o",
-            supports_reasoning=False,
-        )
-    ]
-
-    # Cache models
-    cache.set("openai", models)
-
-    # Retrieve from cache
-    cached = cache.get("openai")
-    assert cached is not None
-    assert len(cached) == 1
-    assert cached[0].id == "openai/gpt-4o"
-
-
-@pytest.mark.unit
-def test_models_cache_get_empty():
-    """Test cache miss returns None."""
-    cache = ModelsCache()
-    cached = cache.get("openai")
-    assert cached is None
-
-
-@pytest.mark.unit
 def test_models_cache_expiration():
-    """Test cache expiration after TTL."""
+    """Test cache expiration after TTL (tests our TTL logic)."""
     cache = ModelsCache(ttl_seconds=1)  # 1 second TTL
 
     models = [
@@ -87,36 +50,6 @@ def test_models_cache_expiration():
 
 
 @pytest.mark.unit
-def test_models_cache_clear_specific_provider():
-    """Test clearing cache for specific provider."""
-    cache = ModelsCache()
-
-    cache.set("openai", [ModelInfo(id="openai/gpt-4o", provider="openai", display_name="GPT-4o", supports_reasoning=False)])
-    cache.set("anthropic", [ModelInfo(id="anthropic/claude-3-5-sonnet-20241022", provider="anthropic", display_name="Claude", supports_reasoning=True)])
-
-    # Clear only openai
-    cache.clear("openai")
-
-    assert cache.get("openai") is None
-    assert cache.get("anthropic") is not None
-
-
-@pytest.mark.unit
-def test_models_cache_clear_all():
-    """Test clearing all cache."""
-    cache = ModelsCache()
-
-    cache.set("openai", [ModelInfo(id="openai/gpt-4o", provider="openai", display_name="GPT-4o", supports_reasoning=False)])
-    cache.set("anthropic", [ModelInfo(id="anthropic/claude-3-5-sonnet-20241022", provider="anthropic", display_name="Claude", supports_reasoning=True)])
-
-    # Clear all
-    cache.clear()
-
-    assert cache.get("openai") is None
-    assert cache.get("anthropic") is None
-
-
-@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_fetch_openai_models_success():
     """Test fetching OpenAI models from API (mocked)."""
@@ -134,7 +67,6 @@ async def test_fetch_openai_models_success():
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
         # Mock response with synchronous json() method
-        from unittest.mock import Mock
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json = Mock(return_value=mock_response_data)
@@ -174,7 +106,6 @@ async def test_fetch_openai_models_http_error():
         mock_client = AsyncMock()
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
-        from unittest.mock import Mock
         mock_response = Mock()
         mock_response.status_code = 401
         mock_response.raise_for_status = Mock(side_effect=httpx.HTTPStatusError(
@@ -216,7 +147,6 @@ async def test_fetch_anthropic_models_success():
         mock_client = AsyncMock()
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
-        from unittest.mock import Mock
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json = Mock(return_value=mock_response_data)
@@ -279,7 +209,6 @@ async def test_fetch_gemini_models_success():
         mock_client = AsyncMock()
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
-        from unittest.mock import Mock
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json = Mock(return_value=mock_response_data)

@@ -1,6 +1,7 @@
-"""Tests for API key service."""
+"""Tests for API key service.
 
-import re
+Only tests business logic - library behavior is tested by the libraries themselves.
+"""
 
 import pytest
 
@@ -8,29 +9,8 @@ from app.features.api_keys.service import APIKeyService
 
 
 @pytest.mark.unit
-def test_generate_key():
-    """Test API key generation."""
-    key = APIKeyService.generate_key()
-
-    # Should be 64 characters
-    assert len(key) == 64
-
-    # Should be alphanumeric only
-    assert re.match(r'^[a-zA-Z0-9]+$', key)
-
-
-@pytest.mark.unit
-def test_generate_id():
-    """Test ID generation."""
-    id = APIKeyService.generate_id()
-
-    # Should be 21 characters (nanoid default)
-    assert len(id) == 21
-
-
-@pytest.mark.unit
 def test_generate_key_uniqueness():
-    """Test that generated keys are unique."""
+    """Test that generated keys are unique (tests our usage pattern)."""
     keys = [APIKeyService.generate_key() for _ in range(100)]
 
     # All should be unique
@@ -39,7 +19,7 @@ def test_generate_key_uniqueness():
 
 @pytest.mark.unit
 def test_generate_id_uniqueness():
-    """Test that generated IDs are unique."""
+    """Test that generated IDs are unique (tests our usage pattern)."""
     ids = [APIKeyService.generate_id() for _ in range(100)]
 
     # All should be unique

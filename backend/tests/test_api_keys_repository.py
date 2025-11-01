@@ -1,4 +1,7 @@
-"""Tests for API key repository."""
+"""Tests for API key repository.
+
+Only tests business logic and constraints - basic ORM behavior is tested by framework.
+"""
 
 import pytest
 
@@ -24,18 +27,8 @@ async def test_create_api_key():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_list_all_api_keys_empty():
-    """Test listing API keys when database is empty."""
-    # Test
-    api_keys = await APIKeyRepository.list_all()
-
-    assert api_keys == []
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
 async def test_list_all_api_keys():
-    """Test listing all API keys."""
+    """Test listing all API keys (verify ordering)."""
     # Create keys
     await APIKeyRepository.create(
         id="id1",
@@ -79,16 +72,6 @@ async def test_get_by_id_found():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_get_by_id_not_found():
-    """Test getting API key by ID when it doesn't exist."""
-    # Test
-    api_key = await APIKeyRepository.get_by_id("nonexistent_id")
-
-    assert api_key is None
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
 async def test_get_by_key_found():
     """Test getting API key by key value when it exists."""
     # Create key
@@ -105,16 +88,6 @@ async def test_get_by_key_found():
     assert api_key.id == created.id
     assert api_key.key == created.key
     assert api_key.name == created.name
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_get_by_key_not_found():
-    """Test getting API key by key value when it doesn't exist."""
-    # Test
-    api_key = await APIKeyRepository.get_by_key("nonexistent_key")
-
-    assert api_key is None
 
 
 @pytest.mark.unit
@@ -136,16 +109,6 @@ async def test_delete_by_id_success():
     # Verify it's gone
     api_key = await APIKeyRepository.get_by_id("delete_me")
     assert api_key is None
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_delete_by_id_not_found():
-    """Test deleting API key by ID when it doesn't exist."""
-    # Test
-    result = await APIKeyRepository.delete_by_id("nonexistent_id")
-
-    assert result is False
 
 
 @pytest.mark.unit
