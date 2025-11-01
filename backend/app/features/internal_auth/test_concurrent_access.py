@@ -20,12 +20,15 @@ from app.proto_gen import auth_pb2, auth_pb2_grpc
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_concurrent_grpc_requests():
     """
     Test that multiple gRPC ValidateApiKey requests can be handled concurrently.
 
-    This simulates the ingestion-service making multiple concurrent API key
+    Requires: gRPC server running on port 50053.
+
+    Simulates the ingestion-service making multiple concurrent API key
     validation requests to the backend.
     """
     num_requests = 50
@@ -71,12 +74,15 @@ async def test_concurrent_grpc_requests():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_mixed_fastapi_and_grpc_requests():
     """
     Test that FastAPI and gRPC requests can be handled concurrently.
 
-    This simulates real-world usage where:
+    Requires: gRPC server running on port 50053.
+
+    Simulates real-world usage where:
     - Users make REST API calls to FastAPI endpoints
     - Ingestion-service makes gRPC calls for API key validation
     Both should work without blocking each other.
@@ -130,12 +136,15 @@ async def test_mixed_fastapi_and_grpc_requests():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_grpc_under_load():
     """
     Test gRPC service under heavy concurrent load.
 
-    This test simulates high traffic to ensure the service remains stable
+    Requires: gRPC server running on port 50053.
+
+    Simulates high traffic to ensure the service remains stable
     and doesn't have race conditions or deadlocks.
     """
     num_requests = 100
@@ -178,12 +187,15 @@ async def test_grpc_under_load():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_database_isolation_concurrent_reads():
     """
     Test that concurrent database reads don't cause conflicts.
 
-    This verifies the database session pattern is working correctly
+    Requires: gRPC server running on port 50053.
+
+    Verifies the database session pattern is working correctly
     and there are no race conditions in concurrent reads.
     """
     num_concurrent_reads = 100

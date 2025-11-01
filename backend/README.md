@@ -77,23 +77,94 @@ curl http://localhost:1324/
 
 ### Running Tests
 
+The test suite includes both unit tests (fast, isolated) and integration tests (require external services).
+
+#### Quick Test Commands
+
 ```bash
-# Run all tests with pytest-asyncio
+# Run all tests
 uv run pytest
+
+# Run only unit tests (fast, no external dependencies)
+uv run pytest -m "not integration"
+
+# Run only integration tests (requires services running)
+uv run pytest -m "integration"
 
 # Run tests with verbose output
 uv run pytest -v
 
 # Run specific test file
 uv run pytest tests/test_main.py -v
+```
 
+#### Test Categories
+
+Tests are organized with pytest markers:
+
+- **`unit`**: Fast, isolated unit tests (no external dependencies)
+- **`integration`**: Integration tests (require database, services)
+- **`requires_grpc_server`**: Tests requiring gRPC server on port 50053
+- **`requires_gemini_api`**: Tests requiring `GEMINI_API_KEY` in environment
+- **`requires_openai_api`**: Tests requiring `OPENAI_API_KEY` in environment
+- **`requires_anthropic_api`**: Tests requiring `ANTHROPIC_API_KEY` in environment
+- **`security`**: Security-focused tests (auth bypass, SQL injection)
+- **`concurrency`**: Concurrency and race condition tests
+- **`error_recovery`**: Error recovery and resilience tests
+
+#### Running Specific Test Categories
+
+```bash
+# Run only Gemini API tests (requires GEMINI_API_KEY in .env)
+uv run pytest -m "requires_gemini_api"
+
+# Run only gRPC server tests (requires gRPC server running)
+uv run pytest -m "requires_grpc_server"
+
+# Run all tests except those requiring external APIs
+uv run pytest -m "not (requires_gemini_api or requires_openai_api or requires_anthropic_api)"
+
+# Run security tests
+uv run pytest -m "security"
+
+# Run concurrency tests
+uv run pytest -m "concurrency"
+```
+
+#### Integration Tests Setup
+
+Integration tests require services to be running:
+
+```bash
+# Terminal 1: Start services
+docker compose up --build
+
+# Terminal 2: Run integration tests
+cd backend
+uv run pytest -m "integration" -v
+```
+
+#### Coverage Reports
+
+```bash
 # Run with coverage report
 uv run pytest --cov=app --cov-report=term-missing
 
 # Generate HTML coverage report
 uv run pytest --cov=app --cov-report=html
 # Then open: open htmlcov/index.html
+
+# Coverage for unit tests only
+uv run pytest -m "not integration" --cov=app --cov-report=html
 ```
+
+#### GitHub Actions
+
+Tests run automatically on pull requests via GitHub Actions:
+- **Unit tests**: Fast execution with no external dependencies
+- **Integration tests**: Run with Docker Compose and GitHub Secrets for API keys
+
+See `.github/workflows/test.yml` for CI/CD configuration.
 
 ## Project Structure
 

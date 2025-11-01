@@ -1,0 +1,106 @@
+name: Backend Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/test.yml'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run linter
+        run: uv run ruff check app/
+
+      - name: Run type checker
+        run: uv run mypy app/
+
+      - name: Run unit tests (excluding integration)
+        run: uv run pytest -m "not integration" -v
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create .env file with secrets
+        run: |
+          cat > .env << EOF
+          JUNJO_BUILD_TARGET=development
+          JUNJO_ENV=development
+          JUNJO_SESSION_SECRET=${{ secrets.JUNJO_SESSION_SECRET }}
+          JUNJO_SECURE_COOKIE_KEY=${{ secrets.JUNJO_SECURE_COOKIE_KEY }}
+          JUNJO_ALLOW_ORIGINS=http://localhost:5151,http://localhost:5153
+          PORT=1323
+          GRPC_PORT=50053
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          DB_SQLITE_PATH=/dbdata/sqlite/junjo.db
+          DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
+          BADGERDB_PATH=/dbdata/badgerdb
+          LOG_LEVEL=info
+          LOG_FORMAT=text
+          EOF
+
+      - name: Create Docker network
+        run: docker network create junjo-network
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose up -d --build
+          echo "Waiting for services to be healthy..."
+          sleep 10
+
+      - name: Check service health
+        run: |
+          docker compose ps
+          docker compose logs backend
+
+      - name: Install uv in backend container
+        run: docker compose exec -T backend pip install uv
+
+      - name: Run integration tests
+        run: |
+          docker compose exec -T backend uv run pytest -m "integration" -v
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Backend Logs ==="
+          docker compose logs backend
+          echo "=== Ingestion Logs ==="
+          docker compose logs ingestion
+          echo "=== Frontend Logs ==="
+          docker compose logs frontend
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

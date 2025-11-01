@@ -14,13 +14,13 @@ from app.proto_gen import auth_pb2, auth_pb2_grpc
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_validate_api_key_integration_with_production_key():
     """
     Integration test: ValidateApiKey with a real API key from production database.
 
-    This test connects to the running gRPC server and tests with the actual
-    production database. It requires:
+    Requires:
     - The gRPC server to be running on port 50053
     - The production database to have at least one API key
 
@@ -47,12 +47,13 @@ async def test_validate_api_key_integration_with_production_key():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_validate_api_key_integration_invalid():
     """
     Integration test: ValidateApiKey with an invalid API key.
 
-    This test requires the gRPC server to be running on port 50053.
+    Requires: gRPC server running on port 50053.
     """
     invalid_key = "invalid_test_key_does_not_exist_12345"
 
@@ -70,12 +71,13 @@ async def test_validate_api_key_integration_invalid():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_validate_api_key_integration_empty():
     """
     Integration test: ValidateApiKey with an empty API key.
 
-    This test requires the gRPC server to be running on port 50053.
+    Requires: gRPC server running on port 50053.
     """
     # Connect to the gRPC server
     async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
@@ -91,13 +93,13 @@ async def test_validate_api_key_integration_empty():
 
 
 @pytest.mark.integration
+@pytest.mark.requires_grpc_server
 @pytest.mark.asyncio
 async def test_grpc_server_connectivity():
     """
     Integration test: Verify gRPC server is accessible and responsive.
 
-    This is a basic connectivity test to ensure the gRPC server is running
-    and accepting connections on the expected port.
+    Requires: gRPC server running on port 50053.
     """
     try:
         # Connect to the gRPC server with a short timeout

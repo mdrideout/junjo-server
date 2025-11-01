@@ -7,9 +7,13 @@ from app.features.llm_playground.service import LLMService
 
 
 @pytest.mark.integration
+@pytest.mark.requires_gemini_api
 @pytest.mark.asyncio
 async def test_gemini_generation(mock_authenticated_user):
-    """Test Gemini model generation through LiteLLM."""
+    """Test Gemini model generation through LiteLLM.
+
+    Requires GEMINI_API_KEY in .env or environment variables.
+    """
     request = GenerateRequest(
         model="gemini/gemini-1.5-flash",
         messages=[Message(role="user", content="Say hello in exactly 3 words.")],
