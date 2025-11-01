@@ -1,72 +1,44 @@
 services:
-  # ============================================================================
-  # Go Backend - DISABLED (Migrating to Python Backend)
-  # ============================================================================
-  # Uncomment below to re-enable for comparison/testing
-  # ============================================================================
-  # junjo-server-backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "1323:1323"
-  #   environment:
-  #     - SQLITE_DB_PATH=/dbdata/sqlite/junjo.db
-  #     - DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
-  #     - INGESTION_SERVICE_INTERNAL_HOST=junjo-server-ingestion
-  #     - INGESTION_SERVICE_INTERNAL_PORT=50052
-  #   volumes:
-  #     - ./.dbdata:/dbdata
-  #   depends_on:
-  #     - junjo-server-ingestion
-  #   networks:
-  #     - junjo-network
-
-  # Python Backend (Primary)
-  junjo-server-backend-python:
+  junjo-server-backend:
     build:
-      context: ./backend_python
+      context: ./backend
       dockerfile: Dockerfile
-      target: dev  # Use dev stage for hot reload
+      target: dev
     ports:
-      - "1324:1324"  # Different port for parallel testing
+      - "1323:1323"
     environment:
       - DEBUG=true
-      - APP_NAME=Junjo Server (Python)
-      - DB_SQLITE_PATH=/dbdata/sqlite/junjo-python.db
+      - APP_NAME=Junjo Server
+      - DB_SQLITE_PATH=/dbdata/sqlite/junjo.db
       - DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
       - INGESTION_HOST=junjo-server-ingestion
       - INGESTION_PORT=50052
       - CORS_ORIGINS=["http://localhost:5151"]
-      - RUN_MIGRATIONS=true  # Auto-run migrations on startup
+      - RUN_MIGRATIONS=true
     volumes:
-      - ./.dbdata:/dbdata  # Consolidated storage location
-      - ./backend_python/app:/app/app  # Hot reload
-    # No dependencies - Python backend starts first (provides gRPC auth service)
+      - ./.dbdata:/dbdata
+      - ./backend/app:/app/app
     networks:
       - junjo-network
 
-  # Ingestion service
   junjo-server-ingestion:
     build:
       context: ./ingestion-service
       dockerfile: Dockerfile
     ports:
-      - "50051:50051"  # Public gRPC
-      - "50052:50052"  # Internal gRPC
+      - "50051:50051"
+      - "50052:50052"
     environment:
       - BADGERDB_PATH=/dbdata/badgerdb
-      # Backend Python gRPC service for API key validation
-      - BACKEND_GRPC_HOST=junjo-server-backend-python
+      - BACKEND_GRPC_HOST=junjo-server-backend
       - BACKEND_GRPC_PORT=50053
     volumes:
-      - ./.dbdata/badgerdb:/dbdata/badgerdb  # Consolidated storage location
+      - ./.dbdata/badgerdb:/dbdata/badgerdb
     depends_on:
-      - junjo-server-backend-python
+      - junjo-server-backend
     networks:
       - junjo-network
 
-  # Frontend (unchanged - can test against either backend)
   junjo-server-frontend:
     build:
       context: ./frontend
@@ -75,8 +47,7 @@ services:
     ports:
       - "5151:80"
     environment:
-      # Point to Python backend for testing
-      - VITE_API_URL=http://localhost:1324
+      - VITE_API_URL=http://localhost:1323
     networks:
       - junjo-network
 

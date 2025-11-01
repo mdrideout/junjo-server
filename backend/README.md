@@ -1,61 +1,245 @@
-# GO API & Telemetry Server
+# Junjo Server - Python Backend
 
-This is the backend GO application running in a docker container of the junjo-server setup.
+Python/FastAPI backend for the Junjo Server LLM observability platform.
 
-**Servers:** This GO application runs two servers.
+## Technology Stack
 
-- GO Echo server: React UI application API requests
-- gRPC server: Receives and handles telemetry from the junjo library
+- **Python 3.14+** (latest stable)
+- **FastAPI** (async web framework)
+- **Pydantic v2+** (data validation and settings)
+- **Loguru** (structured logging)
+- **uv** (fast package management)
 
+## Quick Start
 
-## Code Generation
+### Prerequisites
 
-### Database Migrations & Code Generation
+- Python 3.14+
+- [uv](https://github.com/astral-sh/uv) (recommended)
 
-This project uses [Goose](https://github.com/pressly/goose) for database migrations and [sqlc](https://sqlc.dev/) to compile type-safe Go code from SQL queries.
-
-The database schema is defined through migration files in `db/migrations/`. When you make changes to these migrations, you should regenerate the Go code to keep it in sync:
-
-```bash
-# Regenerate Go database code from migrations (from ./backend)
-$ make db-regenerate
-```
-
-This command will:
-1. Apply all migrations to a temporary in-memory database
-2. Dump the resulting schema to `db/schema.sql`
-3. Generate Go code from the updated schema using sqlc
-
-If you need to create a new migration file:
+### Installation
 
 ```bash
-# Create a new migration file (from ./backend)
-$ make db-new-migration name=your_migration_name
+# Navigate to backend directory
+cd backend_python
+
+# Install dependencies including dev tools (pytest, ruff, mypy)
+uv sync --all-extras
+
+# Or install only production dependencies
+uv sync
 ```
 
-### sqlc
+**Note:** Use `--all-extras` to install development dependencies (pytest, pytest-asyncio, ruff, mypy). This is required for running tests and linters.
 
-You can also run sqlc generation independently:
+### Running the Development Server
+
+#### Option 1: Using uv run (Recommended)
+```bash
+# Start the server with hot reload
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 1324
+```
+
+#### Option 2: Using Python directly
+```bash
+# Start via main module
+uv run python -m app.main
+```
+
+#### Option 3: Using the virtual environment directly
+```bash
+# Activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Run uvicorn
+uvicorn app.main:app --reload --host 0.0.0.0 --port 1324
+```
+
+The API will be available at:
+- **API**: http://localhost:1324
+- **Interactive Docs (Swagger)**: http://localhost:1324/docs
+- **Alternative Docs (ReDoc)**: http://localhost:1324/redoc
+- **Health Check**: http://localhost:1324/health
+- **Ping**: http://localhost:1324/ping
+
+### Testing Endpoints
 
 ```bash
-# Generate GO code from SQL (from ./backend)
-$ make sqlc-generate
+# Test ping endpoint
+curl http://localhost:1324/ping
 
-# or directly with sqlc
-$ sqlc generate
+# Test health endpoint
+curl http://localhost:1324/health
+
+# Test root endpoint
+curl http://localhost:1324/
 ```
 
-### Protobuf
-
-This server receives telemetry from the junjo library via gRPC. The following instructions generate the gRPC service from `.proto` file code.
-
-**Requires:** [protoc](https://grpc.io/docs/protoc-installation/) which can be installed into your developer environment host machine ([instructions](https://grpc.io/docs/protoc-installation/)).
+### Running Tests
 
 ```bash
-# Run the makefile to generate the code
-$ make proto
+# Run all tests with pytest-asyncio
+uv run pytest
+
+# Run tests with verbose output
+uv run pytest -v
+
+# Run specific test file
+uv run pytest tests/test_main.py -v
+
+# Run with coverage report
+uv run pytest --cov=app --cov-report=term-missing
+
+# Generate HTML coverage report
+uv run pytest --cov=app --cov-report=html
+# Then open: open htmlcov/index.html
 ```
 
-#### NOTE:
+## Project Structure
 
-`.proto` files between junjo and junjo-server must match.
+```
+backend_python/
+├── app/
+│   ├── config/          # Settings and configuration
+│   ├── features/        # Feature-based modules
+│   ├── common/          # Shared utilities
+│   └── main.py          # FastAPI app
+├── tests/               # Tests
+└── pyproject.toml       # Dependencies
+```
+
+## Configuration
+
+Configuration is managed via environment variables (see `.env.example`).
+
+Settings are loaded using Pydantic Settings with the following precedence:
+1. Environment variables
+2. `.env` file
+3. Default values in `app/config/settings.py`
+
+### Key Configuration Variables
+
+```bash
+# Application
+DEBUG=true                           # Enable debug logging
+PORT=1324                           # Server port (1324 for dev, 1323 for production)
+CORS_ORIGINS=["http://localhost:5151"]  # Allowed CORS origins
+
+# Database
+DB_SQLITE_PATH=./dbdata/junjo.db    # SQLite database path
+DB_DUCKDB_PATH=./dbdata/traces.duckdb  # DuckDB database path
+
+# Ingestion Service
+INGESTION_HOST=localhost             # Ingestion service host
+INGESTION_PORT=50052                # Ingestion service port
+```
+
+## Development Tools
+
+### Linting
+
+```bash
+# Run ruff linter
+uv run ruff check app/
+
+# Auto-fix issues
+uv run ruff check app/ --fix
+
+# Format code
+uv run ruff format app/
+```
+
+### Type Checking
+
+```bash
+# Run mypy type checker
+uv run mypy app/
+```
+
+## Docker
+
+### Building
+
+```bash
+# Build production image
+docker build -t junjo-backend:latest .
+
+# Build development image with hot reload
+docker build -t junjo-backend:dev --target dev .
+```
+
+### Running
+
+```bash
+# Run production container
+docker run -p 1324:1324 --env-file .env junjo-backend:latest
+
+# Run development container with volume mount
+docker run -p 1324:1324 \
+  -v $(pwd)/app:/app/app \
+  --env-file .env \
+  junjo-backend:dev
+```
+
+### Using Docker Compose
+
+```bash
+# Start Python backend alongside Go backend
+docker compose -f ../docker-compose.dev.yml up junjo-server-backend-python
+
+# View logs
+docker compose -f ../docker-compose.dev.yml logs -f junjo-server-backend-python
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Check what's using port 1324
+lsof -i :1324
+
+# Kill the process
+kill -9 <PID>
+```
+
+### Module Import Errors
+
+If you see `ModuleNotFoundError: No module named 'app'`:
+
+```bash
+# Make sure you're in the backend_python directory
+cd backend_python
+
+# Ensure dependencies are installed
+uv sync
+
+# Run with PYTHONPATH set
+PYTHONPATH=. uv run uvicorn app.main:app --reload
+```
+
+### Virtual Environment Issues
+
+```bash
+# Remove existing venv and reinstall
+rm -rf .venv
+uv sync
+```
+
+## CI/CD Notes
+
+For automated testing in CI/CD pipelines:
+
+```bash
+# Install dependencies (including dev tools)
+uv sync --all-extras
+
+# Run linter
+uv run ruff check app/
+
+# Run type checker
+uv run mypy app/
+
+# Run tests with coverage
+uv run pytest --cov=app --cov-fail-under=80
+```

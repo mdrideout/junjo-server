@@ -19,9 +19,9 @@ _Junjo Server Frontend Screenshot_
 
 The Junjo Server is composed of three primary services:
 
-1.  **`junjo-server-backend`**: The main application server. It's an Echo-based Go application responsible for the HTTP API, user authentication, and all business logic. It uses SQLite for primary data and DuckDB for analytical queries on telemetry data.
+1.  **`junjo-server-backend`**: The main application server built with FastAPI (Python). It handles the HTTP API, user authentication, LLM playground, and all business logic. It uses SQLite for primary data and DuckDB for analytical queries on telemetry data.
 
-2.  **`ingestion-service`**: A lightweight, high-throughput Go service responsible for ingesting OpenTelemetry (OTel) data. It exposes a gRPC endpoint to receive OTel spans and immediately writes them to a BadgerDB instance, which acts as a durable Write-Ahead Log (WAL). This decouples the data ingestion from the main backend, ensuring resilience and scalability.
+2.  **`ingestion-service`**: A lightweight, high-throughput service responsible for ingesting OpenTelemetry (OTel) data. It exposes a gRPC endpoint to receive OTel spans and immediately writes them to a BadgerDB instance, which acts as a durable Write-Ahead Log (WAL). This decouples the data ingestion from the main backend, ensuring resilience and scalability.
 
 3.  **`junjo-server-frontend`**: The web UI providing the user interface for debugging and monitoring Junjo workflows.
 
