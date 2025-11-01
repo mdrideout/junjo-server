@@ -10,13 +10,14 @@ from app.db_sqlite.api_keys.repository import APIKeyRepository
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_create_api_key():
+async def test_create_api_key(mock_authenticated_user):
     """Test API key creation."""
     # Test
     api_key = await APIKeyRepository.create(
         id="test_id_123",
         key="test_key_64_chars_alphanumeric_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Test Key"
+        name="Test Key",
+        authenticated_user=mock_authenticated_user
     )
 
     assert api_key.id == "test_id_123"
@@ -27,22 +28,24 @@ async def test_create_api_key():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_list_all_api_keys():
+async def test_list_all_api_keys(mock_authenticated_user):
     """Test listing all API keys (verify ordering)."""
     # Create keys
     await APIKeyRepository.create(
         id="id1",
         key="key1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Key 1"
+        name="Key 1",
+        authenticated_user=mock_authenticated_user
     )
     await APIKeyRepository.create(
         id="id2",
         key="key2_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Key 2"
+        name="Key 2",
+        authenticated_user=mock_authenticated_user
     )
 
     # Test
-    api_keys = await APIKeyRepository.list_all()
+    api_keys = await APIKeyRepository.list_all(mock_authenticated_user)
 
     assert len(api_keys) == 2
     # Should be ordered by created_at desc, so most recent first
@@ -52,13 +55,14 @@ async def test_list_all_api_keys():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_get_by_id_found():
+async def test_get_by_id_found(mock_authenticated_user):
     """Test getting API key by ID when it exists."""
     # Create key
     created = await APIKeyRepository.create(
         id="test_id",
         key="test_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Test Key"
+        name="Test Key",
+        authenticated_user=mock_authenticated_user
     )
 
     # Test
@@ -72,13 +76,14 @@ async def test_get_by_id_found():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_get_by_key_found():
+async def test_get_by_key_found(mock_authenticated_user):
     """Test getting API key by key value when it exists."""
     # Create key
     created = await APIKeyRepository.create(
         id="test_id",
         key="unique_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Test Key"
+        name="Test Key",
+        authenticated_user=mock_authenticated_user
     )
 
     # Test
@@ -92,17 +97,18 @@ async def test_get_by_key_found():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_delete_by_id_success():
+async def test_delete_by_id_success(mock_authenticated_user):
     """Test deleting API key by ID when it exists."""
     # Create key
     await APIKeyRepository.create(
         id="delete_me",
         key="key_to_delete_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Delete Me"
+        name="Delete Me",
+        authenticated_user=mock_authenticated_user
     )
 
     # Test delete
-    result = await APIKeyRepository.delete_by_id("delete_me")
+    result = await APIKeyRepository.delete_by_id("delete_me", mock_authenticated_user)
 
     assert result is True
 
@@ -113,13 +119,14 @@ async def test_delete_by_id_success():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_key_uniqueness():
+async def test_key_uniqueness(mock_authenticated_user):
     """Test that duplicate keys are rejected (unique constraint)."""
     # Create first key
     await APIKeyRepository.create(
         id="id1",
         key="duplicate_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        name="Key 1"
+        name="Key 1",
+        authenticated_user=mock_authenticated_user
     )
 
     # Try to create second key with same key value
@@ -127,5 +134,6 @@ async def test_key_uniqueness():
         await APIKeyRepository.create(
             id="id2",
             key="duplicate_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            name="Key 2"
+            name="Key 2",
+            authenticated_user=mock_authenticated_user
         )

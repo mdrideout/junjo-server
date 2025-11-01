@@ -14,7 +14,9 @@ from typing import Any, Dict, Optional
 from litellm import acompletion
 from loguru import logger
 
+from app.common.audit import AuditAction, AuditResource, audit_log
 from app.config.settings import settings
+from app.features.auth.models import AuthenticatedUser
 from app.features.llm_playground.schemas import (
     Choice,
     GenerateRequest,
@@ -70,7 +72,7 @@ class LLMService:
             return {"type": "json_object"}
 
     @staticmethod
-    async def generate(request: GenerateRequest) -> GenerateResponse:
+    async def generate(request: GenerateRequest, authenticated_user: AuthenticatedUser) -> GenerateResponse:
         """
         Generate LLM completion using LiteLLM.
 
@@ -81,6 +83,7 @@ class LLMService:
 
         Args:
             request: Generation request with model, messages, and parameters
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             Generation response with content and optional reasoning_content
@@ -88,6 +91,15 @@ class LLMService:
         Raises:
             Exception: If generation fails (API errors, invalid parameters, etc.)
         """
+        # Audit log at service layer (defense in depth)
+        audit_log(
+            AuditAction.CREATE,
+            AuditResource.LLM_GENERATION,
+            None,
+            authenticated_user,
+            {"model": request.model, "message_count": len(request.messages)}
+        )
+
         try:
             # Set up LiteLLM environment variables from Pydantic settings
             LLMService._setup_litellm_env()

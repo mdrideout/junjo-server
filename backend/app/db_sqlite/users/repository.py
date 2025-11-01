@@ -7,9 +7,11 @@ See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.common.audit import AuditAction, AuditResource, audit_log
 from app.db_sqlite import db_config
 from app.db_sqlite.users.models import UserTable
 from app.db_sqlite.users.schemas import UserInDB, UserRead
+from app.features.auth.models import SYSTEM_USER, AuthenticatedUser
 
 
 class UserRepository:
@@ -20,12 +22,17 @@ class UserRepository:
     """
 
     @staticmethod
-    async def create(email: str, password_hash: str) -> UserRead:
+    async def create(
+        email: str,
+        password_hash: str,
+        authenticated_user: AuthenticatedUser = SYSTEM_USER
+    ) -> UserRead:
         """Create a new user.
 
         Args:
             email: User email address
             password_hash: Hashed password (bcrypt)
+            authenticated_user: Authenticated user performing the action (defaults to SYSTEM_USER for first user creation)
 
         Returns:
             Created user (without password hash)
@@ -40,6 +47,15 @@ class UserRepository:
             4. Refresh (load generated fields)
             5. Validate to Pydantic BEFORE session closes
         """
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(
+            AuditAction.DB_INSERT,
+            AuditResource.USER,
+            None,  # ID not yet known
+            authenticated_user,
+            {"email": email}
+        )
+
         try:
             db_obj = UserTable(
                 email=email,
@@ -145,9 +161,72 @@ class UserRepository:
         return count > 0
 
     @staticmethod
-    async def list_users() -> list[UserRead]:
+    async def create_first_user_atomic(email: str, password_hash: str) -> UserRead:
+        """
+        Atomically check if users exist and create first user if none exist.
+
+        Uses SELECT FOR UPDATE to prevent race conditions when multiple requests
+        try to create the first user concurrently.
+
+        Args:
+            email: User email address
+            password_hash: Hashed password (bcrypt)
+
+        Returns:
+            Created user (without password hash)
+
+        Raises:
+            ValueError: If users already exist
+            SQLAlchemyError: If database operation fails
+        """
+        # Audit log with SYSTEM_USER since this is first user creation
+        audit_log(
+            AuditAction.DB_INSERT,
+            AuditResource.USER,
+            None,
+            SYSTEM_USER,
+            {"email": email, "first_user": True}
+        )
+
+        try:
+            async with db_config.async_session() as session:
+                # Start transaction and lock users table to prevent race condition
+                # SELECT COUNT(*) FROM users FOR UPDATE
+                # This locks all rows (or the table itself in some databases)
+                # preventing other transactions from inserting until we commit
+                stmt = select(func.count()).select_from(UserTable).with_for_update()
+                result = await session.execute(stmt)
+                count = result.scalar_one()
+
+                # Check if any users exist (now holding lock)
+                if count > 0:
+                    raise ValueError("Users already exist, cannot create first user")
+
+                # Create first user (still holding lock)
+                db_obj = UserTable(
+                    email=email,
+                    password_hash=password_hash
+                )
+                session.add(db_obj)
+                await session.commit()
+                await session.refresh(db_obj)
+
+                # Validate to Pydantic before session closes
+                return UserRead.model_validate(db_obj)
+
+        except ValueError:
+            # Re-raise ValueError for users already exist
+            raise
+        except SQLAlchemyError as e:
+            raise e
+
+    @staticmethod
+    async def list_users(authenticated_user: AuthenticatedUser) -> list[UserRead]:
         """
         List all users.
+
+        Args:
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             List of all users (without password_hash)
@@ -155,6 +234,9 @@ class UserRepository:
         Raises:
             SQLAlchemyError: If database operation fails
         """
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(AuditAction.DB_QUERY, AuditResource.USER, None, authenticated_user)
+
         try:
             async with db_config.async_session() as session:
                 stmt = select(UserTable)
@@ -168,12 +250,13 @@ class UserRepository:
             raise e
 
     @staticmethod
-    async def delete_user(user_id: str) -> bool:
+    async def delete_user(user_id: str, authenticated_user: AuthenticatedUser) -> bool:
         """
         Delete a user by ID.
 
         Args:
             user_id: User ID to delete
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             True if user was deleted, False if user not found
@@ -181,6 +264,9 @@ class UserRepository:
         Raises:
             SQLAlchemyError: If database operation fails
         """
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(AuditAction.DB_DELETE, AuditResource.USER, user_id, authenticated_user)
+
         try:
             async with db_config.async_session() as session:
                 stmt = delete(UserTable).where(UserTable.id == user_id)

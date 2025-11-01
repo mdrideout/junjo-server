@@ -7,9 +7,11 @@ See: PYTHON_BACKEND_HIGH_CONCURRENCY_DB_PATTERN.md
 from sqlalchemy import delete, select
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.common.audit import AuditAction, AuditResource, audit_log
 from app.db_sqlite import db_config
 from app.db_sqlite.api_keys.models import APIKeyTable
 from app.db_sqlite.api_keys.schemas import APIKeyRead
+from app.features.auth.models import AuthenticatedUser
 
 
 class APIKeyRepository:
@@ -20,13 +22,14 @@ class APIKeyRepository:
     """
 
     @staticmethod
-    async def create(id: str, key: str, name: str) -> APIKeyRead:
+    async def create(id: str, key: str, name: str, authenticated_user: AuthenticatedUser) -> APIKeyRead:
         """Create a new API key.
 
         Args:
             id: Unique identifier for the key (nanoid)
             key: API key value (64-char alphanumeric nanoid)
             name: Human-readable name
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             Created API key
@@ -41,6 +44,15 @@ class APIKeyRepository:
             4. Refresh (load generated fields)
             5. Validate to Pydantic BEFORE session closes
         """
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(
+            AuditAction.DB_INSERT,
+            AuditResource.API_KEY,
+            id,
+            authenticated_user,
+            {"name": name}
+        )
+
         try:
             db_obj = APIKeyTable(
                 id=id,
@@ -60,8 +72,11 @@ class APIKeyRepository:
             raise e
 
     @staticmethod
-    async def list_all() -> list[APIKeyRead]:
+    async def list_all(authenticated_user: AuthenticatedUser) -> list[APIKeyRead]:
         """List all API keys, ordered by created_at descending.
+
+        Args:
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             List of all API keys
@@ -69,6 +84,9 @@ class APIKeyRepository:
         Raises:
             SQLAlchemyError: If database operation fails
         """
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(AuditAction.DB_QUERY, AuditResource.API_KEY, None, authenticated_user)
+
         try:
             async with db_config.async_session() as session:
                 stmt = select(APIKeyTable).order_by(APIKeyTable.created_at.desc())
@@ -134,11 +152,12 @@ class APIKeyRepository:
             raise e
 
     @staticmethod
-    async def delete_by_id(id: str) -> bool:
+    async def delete_by_id(id: str, authenticated_user: AuthenticatedUser) -> bool:
         """Delete an API key by ID.
 
         Args:
             id: API key ID to delete
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             True if key was deleted, False if key not found
@@ -146,6 +165,9 @@ class APIKeyRepository:
         Raises:
             SQLAlchemyError: If database operation fails
         """
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(AuditAction.DB_DELETE, AuditResource.API_KEY, id, authenticated_user)
+
         try:
             async with db_config.async_session() as session:
                 stmt = delete(APIKeyTable).where(APIKeyTable.id == id)

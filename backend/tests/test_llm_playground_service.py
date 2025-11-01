@@ -43,7 +43,7 @@ def test_prepare_response_format_json_schema():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_minimal_request():
+async def test_generate_minimal_request(mock_authenticated_user):
     """Test generate with minimal request parameters."""
     request = GenerateRequest(
         model="openai/gpt-4o",
@@ -72,7 +72,7 @@ async def test_generate_minimal_request():
     )
 
     with patch("app.features.llm_playground.service.acompletion", return_value=mock_response):
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         assert response.id == "chatcmpl-123"
         assert response.model == "openai/gpt-4o"
@@ -84,7 +84,7 @@ async def test_generate_minimal_request():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_with_reasoning_openai():
+async def test_generate_with_reasoning_openai(mock_authenticated_user):
     """Test generate with OpenAI reasoning model (o1/o3/o4 series)."""
     request = GenerateRequest(
         model="openai/o1-preview",
@@ -113,7 +113,7 @@ async def test_generate_with_reasoning_openai():
     )
 
     with patch("app.features.llm_playground.service.acompletion", return_value=mock_response):
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         assert response.reasoning_content == "Let me think step by step..."
         assert response.choices[0].message.content == "Here's the solution"
@@ -121,7 +121,7 @@ async def test_generate_with_reasoning_openai():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_with_reasoning_anthropic():
+async def test_generate_with_reasoning_anthropic(mock_authenticated_user):
     """Test generate with Anthropic extended thinking."""
     request = GenerateRequest(
         model="anthropic/claude-3-5-sonnet-20241022",
@@ -153,7 +153,7 @@ async def test_generate_with_reasoning_anthropic():
     )
 
     with patch("app.features.llm_playground.service.acompletion", return_value=mock_response):
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         # Should concatenate thinking blocks
         assert "First, I'll consider..." in response.reasoning_content
@@ -163,7 +163,7 @@ async def test_generate_with_reasoning_anthropic():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_with_all_parameters():
+async def test_generate_with_all_parameters(mock_authenticated_user):
     """Test generate with all optional parameters."""
     request = GenerateRequest(
         model="openai/gpt-4o",
@@ -197,7 +197,7 @@ async def test_generate_with_all_parameters():
     with patch("app.features.llm_playground.service.acompletion") as mock_acompletion:
         mock_acompletion.return_value = mock_response
 
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         # Verify acompletion was called with correct kwargs
         call_kwargs = mock_acompletion.call_args[1]
@@ -214,7 +214,7 @@ async def test_generate_with_all_parameters():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_with_json_mode():
+async def test_generate_with_json_mode(mock_authenticated_user):
     """Test generate with JSON mode."""
     request = GenerateRequest(
         model="openai/gpt-4o",
@@ -241,7 +241,7 @@ async def test_generate_with_json_mode():
     with patch("app.features.llm_playground.service.acompletion") as mock_acompletion:
         mock_acompletion.return_value = mock_response
 
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         # Verify response_format was passed
         call_kwargs = mock_acompletion.call_args[1]
@@ -252,7 +252,7 @@ async def test_generate_with_json_mode():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_with_json_schema():
+async def test_generate_with_json_schema(mock_authenticated_user):
     """Test generate with JSON schema (structured output)."""
     schema = {
         "type": "object",
@@ -286,7 +286,7 @@ async def test_generate_with_json_schema():
     with patch("app.features.llm_playground.service.acompletion") as mock_acompletion:
         mock_acompletion.return_value = mock_response
 
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         # Verify response_format includes json_schema
         call_kwargs = mock_acompletion.call_args[1]
@@ -299,7 +299,7 @@ async def test_generate_with_json_schema():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_handles_null_content():
+async def test_generate_handles_null_content(mock_authenticated_user):
     """Test generate handles null content from LiteLLM (edge case)."""
     request = GenerateRequest(
         model="openai/gpt-4o",
@@ -323,7 +323,7 @@ async def test_generate_handles_null_content():
     mock_response.usage = None
 
     with patch("app.features.llm_playground.service.acompletion", return_value=mock_response):
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
         # Should convert None to empty string
         assert response.choices[0].message.content == ""
@@ -331,7 +331,7 @@ async def test_generate_handles_null_content():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_generate_exception_handling():
+async def test_generate_exception_handling(mock_authenticated_user):
     """Test generate raises exception on LiteLLM failure."""
     request = GenerateRequest(
         model="openai/gpt-4o",
@@ -342,4 +342,4 @@ async def test_generate_exception_handling():
         mock_acompletion.side_effect = Exception("API error")
 
         with pytest.raises(Exception, match="API error"):
-            await LLMService.generate(request)
+            await LLMService.generate(request, authenticated_user=mock_authenticated_user)

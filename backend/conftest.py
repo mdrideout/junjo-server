@@ -9,7 +9,9 @@ inside fixtures to ensure correct initialization order.
 
 import os
 import tempfile
+from datetime import datetime
 
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -73,3 +75,20 @@ async def test_db():
         os.rmdir(temp_dir)
     except Exception:
         pass  # Ignore cleanup errors
+
+
+@pytest.fixture
+def mock_authenticated_user():
+    """Create a mock AuthenticatedUser for testing.
+
+    Returns:
+        AuthenticatedUser: Mock user with test email and session info
+    """
+    from app.features.auth.models import AuthenticatedUser
+
+    return AuthenticatedUser(
+        email="test@example.com",
+        user_id="test_user_123",
+        authenticated_at=datetime(2025, 1, 1, 12, 0, 0),
+        session_id="test_session_abc123"
+    )

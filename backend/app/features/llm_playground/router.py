@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate(request: GenerateRequest, current_user_email: CurrentUserEmail):
+async def generate(request: GenerateRequest, authenticated_user: CurrentUserEmail):
     """
     Generate LLM completion (unified endpoint for all providers).
 
@@ -32,7 +32,7 @@ async def generate(request: GenerateRequest, current_user_email: CurrentUserEmai
 
     Args:
         request: Generation request with model, messages, and parameters
-        current_user_email: Current user email from session (auth dependency)
+        authenticated_user: Authenticated user from session (auth dependency)
 
     Returns:
         Generation response with content and optional reasoning_content
@@ -41,7 +41,7 @@ async def generate(request: GenerateRequest, current_user_email: CurrentUserEmai
         HTTPException: 500 if generation fails
     """
     try:
-        response = await LLMService.generate(request)
+        response = await LLMService.generate(request, authenticated_user)
         return response
     except Exception as e:
         logger.error(f"Generation error: {e}", exc_info=True)
@@ -51,7 +51,7 @@ async def generate(request: GenerateRequest, current_user_email: CurrentUserEmai
 
 
 @router.get("/providers/{provider}/models", response_model=ModelsResponse)
-async def list_provider_models(provider: str, current_user_email: CurrentUserEmail):
+async def list_provider_models(provider: str, authenticated_user: CurrentUserEmail):
     """
     List models for specific provider.
 
@@ -63,7 +63,7 @@ async def list_provider_models(provider: str, current_user_email: CurrentUserEma
 
     Args:
         provider: Provider name (openai, anthropic, gemini)
-        current_user_email: Current user email from session (auth dependency)
+        authenticated_user: Authenticated user from session (auth dependency)
 
     Returns:
         List of models for provider
@@ -98,7 +98,7 @@ async def list_provider_models(provider: str, current_user_email: CurrentUserEma
 
 
 @router.post("/providers/{provider}/models/refresh", response_model=ModelsResponse)
-async def refresh_provider_models(provider: str, current_user_email: CurrentUserEmail):
+async def refresh_provider_models(provider: str, authenticated_user: CurrentUserEmail):
     """
     Force refresh models from provider API (bypass cache).
 
@@ -106,7 +106,7 @@ async def refresh_provider_models(provider: str, current_user_email: CurrentUser
 
     Args:
         provider: Provider name (openai, anthropic, gemini)
-        current_user_email: Current user email from session (auth dependency)
+        authenticated_user: Authenticated user from session (auth dependency)
 
     Returns:
         Updated list of models

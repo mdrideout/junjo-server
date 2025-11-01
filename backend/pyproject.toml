@@ -80,4 +80,8 @@ testpaths = ["tests", "app"]
 markers = [
     "unit: Unit tests (fast, isolated)",
     "integration: Integration tests (slower, uses real DB)",
+    "security: Security tests (auth bypass, SQL injection, XSS)",
+    "concurrency: Concurrency and race condition tests",
+    "error_recovery: Error recovery and resilience tests",
+    "slow: Slow tests (>1 second)",
 ]

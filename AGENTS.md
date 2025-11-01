@@ -2128,18 +2128,315 @@ Shared code lives at the app level:
 
 ## Examples
 
-### Example Backend Feature: API Keys
+### Example Python Backend Feature: API Keys (with Defense-in-Depth)
+
+The Python backend implements **defense-in-depth security** by passing `AuthenticatedUser` objects through all layers and performing audit logging at each layer.
 
 ```
-backend/api/api_keys/
-  handler.go          # CreateAPIKey, ListAPIKeys, DeleteAPIKey handlers
-  service.go          # Business logic for key generation, validation
-  repository.go       # Database operations with user ownership checks
-  dto.go              # CreateAPIKeyRequest, APIKeyResponse
-  constants.go        # MaxAPIKeysPerUser, APIKeyPrefix
-  handler_test.go
-  service_test.go
+backend/app/features/api_keys/
+  router.py           # CreateAPIKey, ListAPIKeys, DeleteAPIKey endpoints
+  service.py          # Business logic with audit logging
+backend/app/db_sqlite/api_keys/
+  repository.py       # Database operations with audit logging
+  models.py           # SQLAlchemy models
+  schemas.py          # Pydantic request/response models
+backend/app/features/auth/
+  dependencies.py     # CurrentUser dependency
+  models.py           # AuthenticatedUser dataclass
+backend/app/common/
+  audit.py            # Audit logging utilities
 ```
+
+#### Router Layer (app/features/api_keys/router.py)
+
+```python
+from fastapi import APIRouter, HTTPException, status
+from app.features.auth.dependencies import CurrentUser
+from app.common.audit import AuditAction, AuditResource, audit_log
+from app.features.api_keys.service import APIKeyService
+from app.db_sqlite.api_keys.schemas import APIKeyCreate, APIKeyRead
+
+router = APIRouter(prefix="/api_keys", tags=["api_keys"])
+
+@router.post("", response_model=APIKeyRead, status_code=status.HTTP_201_CREATED)
+async def create_api_key(request: APIKeyCreate, authenticated_user: CurrentUser):
+    """Create a new API key (requires authentication).
+
+    Any authenticated user can create keys (shared resource).
+    """
+    # Audit log at router layer (defense in depth)
+    audit_log(AuditAction.CREATE, AuditResource.API_KEY, None, authenticated_user, {"name": request.name})
+
+    try:
+        api_key = await APIKeyService.create_api_key(name=request.name, authenticated_user=authenticated_user)
+        return api_key
+    except Exception as e:
+        logger.error(f"Failed to create API key: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create API key")
+
+@router.get("", response_model=list[APIKeyRead])
+async def list_api_keys(authenticated_user: CurrentUser):
+    """List all API keys (requires authentication)."""
+    audit_log(AuditAction.LIST, AuditResource.API_KEY, None, authenticated_user)
+
+    api_keys = await APIKeyService.list_api_keys(authenticated_user=authenticated_user)
+    return api_keys
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_api_key(id: str, authenticated_user: CurrentUser):
+    """Delete an API key (requires authentication)."""
+    audit_log(AuditAction.DELETE, AuditResource.API_KEY, id, authenticated_user)
+
+    deleted = await APIKeyService.delete_api_key(id, authenticated_user=authenticated_user)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="API key not found")
+    return None
+```
+
+#### Service Layer (app/features/api_keys/service.py)
+
+```python
+import nanoid
+from app.common.audit import AuditAction, AuditResource, audit_log
+from app.db_sqlite.api_keys.repository import APIKeyRepository
+from app.db_sqlite.api_keys.schemas import APIKeyRead
+from app.features.auth.models import AuthenticatedUser
+
+class APIKeyService:
+    """Service for API key business logic."""
+
+    @staticmethod
+    async def create_api_key(name: str, authenticated_user: AuthenticatedUser) -> APIKeyRead:
+        """Create a new API key."""
+        # Generate ID and key
+        key_id = nanoid.generate()
+        key_value = nanoid.generate(alphabet="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", size=64)
+
+        # Audit log at service layer (defense in depth)
+        audit_log(
+            AuditAction.CREATE,
+            AuditResource.API_KEY,
+            key_id,
+            authenticated_user,
+            {"name": name, "key_preview": key_value[:8] + "..."}
+        )
+
+        # Save to database
+        return await APIKeyRepository.create(
+            id=key_id,
+            key=key_value,
+            name=name,
+            authenticated_user=authenticated_user
+        )
+
+    @staticmethod
+    async def list_api_keys(authenticated_user: AuthenticatedUser) -> list[APIKeyRead]:
+        """List all API keys."""
+        audit_log(AuditAction.LIST, AuditResource.API_KEY, None, authenticated_user)
+        return await APIKeyRepository.list_all(authenticated_user=authenticated_user)
+
+    @staticmethod
+    async def delete_api_key(id: str, authenticated_user: AuthenticatedUser) -> bool:
+        """Delete an API key by ID."""
+        audit_log(AuditAction.DELETE, AuditResource.API_KEY, id, authenticated_user)
+        return await APIKeyRepository.delete_by_id(id, authenticated_user=authenticated_user)
+```
+
+#### Repository Layer (app/db_sqlite/api_keys/repository.py)
+
+```python
+from sqlalchemy import delete, select
+from app.common.audit import AuditAction, AuditResource, audit_log
+from app.db_sqlite import db_config
+from app.db_sqlite.api_keys.models import APIKeyTable
+from app.db_sqlite.api_keys.schemas import APIKeyRead
+from app.features.auth.models import AuthenticatedUser
+
+class APIKeyRepository:
+    """Repository for API key database operations."""
+
+    @staticmethod
+    async def create(id: str, key: str, name: str, authenticated_user: AuthenticatedUser) -> APIKeyRead:
+        """Create a new API key."""
+        # Audit log at repository layer (defense in depth - database operation)
+        audit_log(
+            AuditAction.DB_INSERT,
+            AuditResource.API_KEY,
+            id,
+            authenticated_user,
+            {"name": name}
+        )
+
+        db_obj = APIKeyTable(id=id, key=key, name=name)
+
+        async with db_config.async_session() as session:
+            session.add(db_obj)
+            await session.commit()
+            await session.refresh(db_obj)
+            return APIKeyRead.model_validate(db_obj)
+
+    @staticmethod
+    async def list_all(authenticated_user: AuthenticatedUser) -> list[APIKeyRead]:
+        """List all API keys."""
+        audit_log(AuditAction.DB_QUERY, AuditResource.API_KEY, None, authenticated_user)
+
+        async with db_config.async_session() as session:
+            stmt = select(APIKeyTable).order_by(APIKeyTable.created_at.desc())
+            result = await session.execute(stmt)
+            db_objs = result.scalars().all()
+            return [APIKeyRead.model_validate(obj) for obj in db_objs]
+
+    @staticmethod
+    async def delete_by_id(id: str, authenticated_user: AuthenticatedUser) -> bool:
+        """Delete an API key by ID."""
+        audit_log(AuditAction.DB_DELETE, AuditResource.API_KEY, id, authenticated_user)
+
+        async with db_config.async_session() as session:
+            stmt = delete(APIKeyTable).where(APIKeyTable.id == id)
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount > 0
+```
+
+#### Authentication Dependency (app/features/auth/dependencies.py)
+
+```python
+from datetime import datetime
+from typing import Annotated
+from fastapi import Depends, HTTPException, Request, status
+from app.db_sqlite.users.repository import UserRepository
+from app.features.auth.models import AuthenticatedUser
+
+async def get_authenticated_user(request: Request) -> AuthenticatedUser:
+    """Dependency to get authenticated user with full audit context from session."""
+    # Check session
+    user_email = request.session.get("userEmail")
+    if user_email is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
+    # Query database for full user details
+    user = await UserRepository.get_by_email(user_email)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    # Extract session metadata
+    session_id = request.session.get("session_id", "unknown")
+    authenticated_at_str = request.session.get("authenticated_at")
+    authenticated_at = datetime.fromisoformat(authenticated_at_str) if authenticated_at_str else datetime.now()
+
+    # Return AuthenticatedUser with complete context
+    return AuthenticatedUser(
+        email=user.email,
+        user_id=user.id,
+        authenticated_at=authenticated_at,
+        session_id=session_id
+    )
+
+# Type alias for dependency injection
+CurrentUser = Annotated[AuthenticatedUser, Depends(get_authenticated_user)]
+```
+
+#### AuthenticatedUser Model (app/features/auth/models.py)
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+
+@dataclass(frozen=True)
+class AuthenticatedUser:
+    """Immutable authenticated user context for audit logging."""
+    email: str
+    user_id: str
+    authenticated_at: datetime
+    session_id: str
+
+# System user for operations not tied to a specific user
+SYSTEM_USER = AuthenticatedUser(
+    email="system@internal",
+    user_id="system",
+    authenticated_at=datetime.min,
+    session_id="system"
+)
+```
+
+#### Audit Logging Utility (app/common/audit.py)
+
+```python
+from typing import Any
+from loguru import logger
+from app.features.auth.models import AuthenticatedUser
+
+def audit_log(
+    action: str,
+    resource_type: str,
+    resource_id: str | None,
+    user: AuthenticatedUser,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Log an auditable action with full user context."""
+    logger.info(
+        f"AUDIT: {action.upper()} {resource_type}",
+        extra={
+            "action": action,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "user_email": user.email,
+            "user_id": user.user_id,
+            "session_id": user.session_id,
+            "authenticated_at": user.authenticated_at.isoformat(),
+            "details": details or {},
+            "audit": True,
+        },
+    )
+
+class AuditAction:
+    """Standard audit action names."""
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    DELETE = "delete"
+    LIST = "list"
+    DB_INSERT = "db_insert"
+    DB_QUERY = "db_query"
+    DB_UPDATE = "db_update"
+    DB_DELETE = "db_delete"
+
+class AuditResource:
+    """Standard resource type names."""
+    API_KEY = "api_key"
+    USER = "user"
+    SESSION = "session"
+    LLM_GENERATION = "llm_generation"
+```
+
+#### Key Patterns
+
+**Defense in Depth:**
+- `AuthenticatedUser` object passed through ALL layers (router → service → repository)
+- Audit logging at EACH layer with different action types:
+  - Router: `create`, `read`, `update`, `delete`, `list`
+  - Service: Same as router (middle layer validation)
+  - Repository: `db_insert`, `db_query`, `db_update`, `db_delete`
+
+**Immutable Security Context:**
+- `AuthenticatedUser` is a frozen dataclass (cannot be modified)
+- Contains full audit context: email, user_id, authenticated_at, session_id
+- Prevents tampering during request processing
+
+**Session Management:**
+- Session metadata stored on sign-in: `session_id`, `authenticated_at`
+- Dependency extracts full user context from session + database
+- Middleware handles encryption (SecureCookiesMiddleware) and signing (SessionMiddleware)
+
+**High-Concurrency Pattern:**
+- Each repository method creates its own database session: `async with db_config.async_session() as session`
+- Complete isolation between concurrent requests
+- No session sharing between operations
+
+**Structured Audit Logs:**
+- JSON-structured logs with loguru's `extra` parameter
+- Easy to parse, filter, and analyze
+- Includes: who (user), what (action), when (timestamp), where (resource), why (details)
 
 ### Example Frontend Feature: Prompt Playground
 

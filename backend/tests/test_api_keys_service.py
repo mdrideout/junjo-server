@@ -28,10 +28,13 @@ def test_generate_id_uniqueness():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_create_api_key():
+async def test_create_api_key(mock_authenticated_user):
     """Test creating API key via service."""
     # Test
-    api_key = await APIKeyService.create_api_key(name="Test Key")
+    api_key = await APIKeyService.create_api_key(
+        name="Test Key",
+        authenticated_user=mock_authenticated_user
+    )
 
     # Should have generated ID and key
     assert api_key.id is not None
@@ -44,14 +47,14 @@ async def test_create_api_key():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_list_api_keys():
+async def test_list_api_keys(mock_authenticated_user):
     """Test listing API keys via service."""
     # Create some keys
-    await APIKeyService.create_api_key(name="Key 1")
-    await APIKeyService.create_api_key(name="Key 2")
+    await APIKeyService.create_api_key(name="Key 1", authenticated_user=mock_authenticated_user)
+    await APIKeyService.create_api_key(name="Key 2", authenticated_user=mock_authenticated_user)
 
     # List
-    api_keys = await APIKeyService.list_api_keys()
+    api_keys = await APIKeyService.list_api_keys(authenticated_user=mock_authenticated_user)
 
     assert len(api_keys) >= 2
     # Check names appear in list
@@ -62,26 +65,35 @@ async def test_list_api_keys():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_delete_api_key():
+async def test_delete_api_key(mock_authenticated_user):
     """Test deleting API key via service."""
     # Create key
-    created = await APIKeyService.create_api_key(name="Delete Me")
+    created = await APIKeyService.create_api_key(
+        name="Delete Me",
+        authenticated_user=mock_authenticated_user
+    )
 
     # Delete
-    result = await APIKeyService.delete_api_key(created.id)
+    result = await APIKeyService.delete_api_key(
+        created.id,
+        authenticated_user=mock_authenticated_user
+    )
 
     assert result is True
 
     # Verify it's gone
-    api_keys = await APIKeyService.list_api_keys()
+    api_keys = await APIKeyService.list_api_keys(authenticated_user=mock_authenticated_user)
     ids = [key.id for key in api_keys]
     assert created.id not in ids
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_delete_nonexistent_api_key():
+async def test_delete_nonexistent_api_key(mock_authenticated_user):
     """Test deleting non-existent API key."""
-    result = await APIKeyService.delete_api_key("nonexistent_id")
+    result = await APIKeyService.delete_api_key(
+        "nonexistent_id",
+        authenticated_user=mock_authenticated_user
+    )
 
     assert result is False

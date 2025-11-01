@@ -4,6 +4,8 @@ Authentication router.
 Implements all authentication endpoints, mirroring the Go implementation.
 """
 
+import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request, status
 from loguru import logger
@@ -109,6 +111,10 @@ async def sign_in(sign_in_request: SignInRequest, request: Request):
     # Set user email in session (middleware handles encryption + signing)
     request.session["userEmail"] = user.email
 
+    # Store session metadata for audit logging (used by get_authenticated_user dependency)
+    request.session["session_id"] = secrets.token_urlsafe(32)  # Unique session identifier
+    request.session["authenticated_at"] = datetime.now().isoformat()  # ISO 8601 timestamp
+
     logger.info(f"User signed in successfully: {user.email}")
     return UserResponse(message="signed in")
 
@@ -147,7 +153,7 @@ async def auth_test(current_user_email: CurrentUserEmail):
     Returns:
         AuthTestResponse with user email
     """
-    return AuthTestResponse(user_email=current_user_email)
+    return AuthTestResponse(user_email=current_user_email.email)
 
 
 # --- Protected Endpoints (auth required via dependency) ---
@@ -155,7 +161,7 @@ async def auth_test(current_user_email: CurrentUserEmail):
 
 @router.post("/users", response_model=UserResponse)
 async def create_user(
-    request: CreateUserRequest, current_user_email: CurrentUserEmail
+    request: CreateUserRequest, authenticated_user: CurrentUserEmail
 ):
     """
     Create a new user (auth required).
@@ -164,7 +170,7 @@ async def create_user(
 
     Args:
         request: CreateUserRequest with email and password
-        current_user_email: Injected by CurrentUserEmail dependency
+        authenticated_user: Injected by CurrentUserEmail dependency
 
     Returns:
         UserResponse with success message
@@ -173,9 +179,9 @@ async def create_user(
         HTTPException: 409 if email already exists
     """
     try:
-        await AuthService.create_user(request.email, request.password)
+        await AuthService.create_user(request.email, request.password, authenticated_user)
         logger.info(
-            f"User created by {current_user_email}: {request.email}"
+            f"User created by {authenticated_user.email}: {request.email}"
         )
         return UserResponse(message="User created successfully")
     except IntegrityError:
@@ -186,24 +192,24 @@ async def create_user(
 
 
 @router.get("/users", response_model=list[UserRead])
-async def list_users(current_user_email: CurrentUserEmail):
+async def list_users(authenticated_user: CurrentUserEmail):
     """
     List all users (auth required).
 
     Uses CurrentUserEmail dependency for auth check.
 
     Args:
-        current_user_email: Injected by CurrentUserEmail dependency
+        authenticated_user: Injected by CurrentUserEmail dependency
 
     Returns:
         List of UserRead objects
     """
-    users = await AuthService.list_users()
+    users = await AuthService.list_users(authenticated_user)
     return users
 
 
 @router.delete("/users/{user_id}", response_model=UserResponse)
-async def delete_user(user_id: str, current_user_email: CurrentUserEmail):
+async def delete_user(user_id: str, authenticated_user: CurrentUserEmail):
     """
     Delete a user (auth required).
 
@@ -211,7 +217,7 @@ async def delete_user(user_id: str, current_user_email: CurrentUserEmail):
 
     Args:
         user_id: User ID to delete
-        current_user_email: Injected by CurrentUserEmail dependency
+        authenticated_user: Injected by CurrentUserEmail dependency
 
     Returns:
         UserResponse with success message
@@ -219,11 +225,11 @@ async def delete_user(user_id: str, current_user_email: CurrentUserEmail):
     Raises:
         HTTPException: 404 if user not found
     """
-    deleted = await AuthService.delete_user(user_id)
+    deleted = await AuthService.delete_user(user_id, authenticated_user)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    logger.info(f"User deleted by {current_user_email}: {user_id}")
+    logger.info(f"User deleted by {authenticated_user.email}: {user_id}")
     return UserResponse(message="User deleted successfully")

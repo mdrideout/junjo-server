@@ -5,8 +5,10 @@ Handles business logic for API key management including secure key generation.
 
 import nanoid
 
+from app.common.audit import AuditAction, AuditResource, audit_log
 from app.db_sqlite.api_keys.repository import APIKeyRepository
 from app.db_sqlite.api_keys.schemas import APIKeyRead
+from app.features.auth.models import AuthenticatedUser
 
 
 class APIKeyService:
@@ -39,11 +41,12 @@ class APIKeyService:
         return nanoid.generate()
 
     @staticmethod
-    async def create_api_key(name: str) -> APIKeyRead:
+    async def create_api_key(name: str, authenticated_user: AuthenticatedUser) -> APIKeyRead:
         """Create a new API key.
 
         Args:
             name: Human-readable name for the key
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             Created API key with generated ID and key value
@@ -55,16 +58,29 @@ class APIKeyService:
         key_id = APIKeyService.generate_id()
         key_value = APIKeyService.generate_key()
 
+        # Audit log at service layer (defense in depth)
+        audit_log(
+            AuditAction.CREATE,
+            AuditResource.API_KEY,
+            key_id,
+            authenticated_user,
+            {"name": name, "key_preview": key_value[:8] + "..."}
+        )
+
         # Save to database
         return await APIKeyRepository.create(
             id=key_id,
             key=key_value,
-            name=name
+            name=name,
+            authenticated_user=authenticated_user
         )
 
     @staticmethod
-    async def list_api_keys() -> list[APIKeyRead]:
+    async def list_api_keys(authenticated_user: AuthenticatedUser) -> list[APIKeyRead]:
         """List all API keys.
+
+        Args:
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             List of all API keys, ordered by created_at descending
@@ -72,14 +88,18 @@ class APIKeyService:
         Raises:
             SQLAlchemyError: If database operation fails
         """
-        return await APIKeyRepository.list_all()
+        # Audit log at service layer (defense in depth)
+        audit_log(AuditAction.LIST, AuditResource.API_KEY, None, authenticated_user)
+
+        return await APIKeyRepository.list_all(authenticated_user=authenticated_user)
 
     @staticmethod
-    async def delete_api_key(id: str) -> bool:
+    async def delete_api_key(id: str, authenticated_user: AuthenticatedUser) -> bool:
         """Delete an API key by ID.
 
         Args:
             id: API key ID to delete
+            authenticated_user: Authenticated user performing the action
 
         Returns:
             True if key was deleted, False if not found
@@ -87,4 +107,7 @@ class APIKeyService:
         Raises:
             SQLAlchemyError: If database operation fails
         """
-        return await APIKeyRepository.delete_by_id(id)
+        # Audit log at service layer (defense in depth)
+        audit_log(AuditAction.DELETE, AuditResource.API_KEY, id, authenticated_user)
+
+        return await APIKeyRepository.delete_by_id(id, authenticated_user=authenticated_user)

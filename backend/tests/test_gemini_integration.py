@@ -8,7 +8,7 @@ from app.features.llm_playground.service import LLMService
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_gemini_generation():
+async def test_gemini_generation(mock_authenticated_user):
     """Test Gemini model generation through LiteLLM."""
     request = GenerateRequest(
         model="gemini/gemini-1.5-flash",
@@ -17,7 +17,7 @@ async def test_gemini_generation():
         max_tokens=10,
     )
 
-    response = await LLMService.generate(request)
+    response = await LLMService.generate(request, authenticated_user=mock_authenticated_user)
 
     # Verify response structure
     assert response.id is not None

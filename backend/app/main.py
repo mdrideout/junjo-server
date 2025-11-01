@@ -144,11 +144,13 @@ app.add_middleware(
 
 # 2. Add SESSION middleware SECOND (inner layer)
 #    This signs/validates session data
+#    https_only should be True in production, False in development/test
+is_production = settings.session_cookie.junjo_env == "production"
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.session_cookie.session_secret,  # Signing key
     max_age=86400 * 30,  # 30 days (matches Go implementation)
-    https_only=True,  # HTTPS in production (HTTP in dev is OK)
+    https_only=is_production,  # HTTPS required in production only
     same_site="strict",  # CSRF protection
 )
 
