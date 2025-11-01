@@ -13,7 +13,7 @@ async def test_gemini():
     print("=" * 60)
 
     request = GenerateRequest(
-        model="gemini/gemini-1.5-flash",
+        model="gemini/gemini-2.5-flash-lite",
         messages=[Message(role="user", content="Say hello in exactly 3 words.")],
         temperature=0.7,
         max_tokens=10,
@@ -40,6 +40,7 @@ async def test_gemini():
         print("\n✗ FAILED!")
         print(f"  Error: {e}")
         import traceback
+
         traceback.print_exc()
         print("=" * 60)
         return 1

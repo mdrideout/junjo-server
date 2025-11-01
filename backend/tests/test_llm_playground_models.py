@@ -108,9 +108,11 @@ async def test_fetch_openai_models_http_error():
 
         mock_response = Mock()
         mock_response.status_code = 401
-        mock_response.raise_for_status = Mock(side_effect=httpx.HTTPStatusError(
-            "Unauthorized", request=Mock(), response=mock_response
-        ))
+        mock_response.raise_for_status = Mock(
+            side_effect=httpx.HTTPStatusError(
+                "Unauthorized", request=Mock(), response=mock_response
+            )
+        )
         mock_client.get = AsyncMock(return_value=mock_response)
 
         with patch("app.features.llm_playground.models.settings") as mock_settings:
@@ -188,7 +190,7 @@ async def test_fetch_gemini_models_success():
                 "supportedGenerationMethods": ["generateContent"],
             },
             {
-                "name": "models/gemini-1.5-flash",
+                "name": "models/gemini-2.5-flash-lite",
                 "displayName": "Gemini 1.5 Flash",
                 "supportedGenerationMethods": ["generateContent", "embedContent"],
             },
@@ -224,7 +226,7 @@ async def test_fetch_gemini_models_success():
             assert len(models) == 2
             model_ids = [m.id for m in models]
             assert "gemini/gemini-2.5-pro" in model_ids
-            assert "gemini/gemini-1.5-flash" in model_ids
+            assert "gemini/gemini-2.5-flash-lite" in model_ids
             assert "gemini/text-embedding-004" not in model_ids
             assert "gemini/palm-2" not in model_ids
 

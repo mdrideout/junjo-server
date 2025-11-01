@@ -15,7 +15,7 @@ async def test_gemini_generation(mock_authenticated_user):
     Requires GEMINI_API_KEY in .env or environment variables.
     """
     request = GenerateRequest(
-        model="gemini/gemini-1.5-flash",
+        model="gemini/gemini-2.5-flash-lite",
         messages=[Message(role="user", content="Say hello in exactly 3 words.")],
         temperature=0.7,
         max_tokens=10,
