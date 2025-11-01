@@ -22,7 +22,12 @@ interface GenerationSettingsModalProps {
 // Detect if model is a reasoning model (OpenAI o1, o3, o4, gpt-5)
 const isReasoningModel = (modelId: string | null): boolean => {
   if (!modelId) return false
-  return /^(o1-|o3-|o4-|gpt-5)/.test(modelId)
+
+  // Strip provider prefix (e.g., "openai/" or "google/")
+  const modelWithoutProvider = modelId.includes('/') ? modelId.split('/')[1] : modelId
+
+  // Check if it's a reasoning model
+  return /^(o1-|o1$|o3-|o3$|o4-|o4$|gpt-5)/.test(modelWithoutProvider)
 }
 
 export default function GenerationSettingsModal({
@@ -158,43 +163,28 @@ export default function GenerationSettingsModal({
               <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Anthropic Settings</h3>
               <div className="space-y-4">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                      Extended Thinking
-                    </label>
-                    <Switch
-                      checked={localSettings.thinking_enabled || false}
-                      onChange={(checked) => updateSetting('thinking_enabled', checked)}
-                    />
-                  </div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Extended Thinking
+                  </label>
+                  <select
+                    value={localSettings.reasoning_effort || ''}
+                    onChange={(e) =>
+                      updateSetting(
+                        'reasoning_effort',
+                        e.target.value as GenerationSettings['reasoning_effort']
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="">Disabled</option>
+                    <option value="low">Low (1024 tokens)</option>
+                    <option value="medium">Medium (2048 tokens)</option>
+                    <option value="high">High (4096 tokens)</option>
+                  </select>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Enable Claude's extended reasoning process with visible thinking.
+                    Enable Claude's extended reasoning process with visible thinking. Higher levels allocate more tokens.
                   </p>
                 </div>
-
-                {localSettings.thinking_enabled && (
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Thinking Budget (tokens)
-                    </label>
-                    <input
-                      type="number"
-                      min="1024"
-                      value={localSettings.thinking_budget_tokens || ''}
-                      onChange={(e) =>
-                        updateSetting(
-                          'thinking_budget_tokens',
-                          e.target.value ? Number(e.target.value) : undefined
-                        )
-                      }
-                      placeholder="1024 minimum"
-                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-                    />
-                    <p className="text-xs text-zinc-500 mt-1">
-                      Tokens allocated for thinking (must be ≥1024 and less than max_tokens)
-                    </p>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">

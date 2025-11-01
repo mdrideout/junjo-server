@@ -8,6 +8,7 @@ export interface ParsedModelInfo {
   releaseType: 'stable' | 'preview' | 'exp' // for filtering only
   displayName: string
   sortKey: string // for sorting within groups
+  isDated?: boolean // whether this model has a date suffix (for filtering)
 }
 
 /**
@@ -86,16 +87,19 @@ export function parseAnthropicModel(model: ModelInfo): ParsedModelInfo {
  * Parse an OpenAI model name into its components
  * Examples:
  * - gpt-5-pro → { productFamily: "gpt-5", version: "5", variant: "pro", releaseType: "stable" }
- * - gpt-4o-mini-2024-07-18 → { productFamily: "gpt-4o", version: "4o", variant: "mini", releaseType: "stable" }
- * - gpt-4o-audio-preview → { productFamily: "gpt-4o", version: "4o", variant: "audio", releaseType: "preview" }
+ * - gpt-4o-mini-2024-07-18 → { productFamily: "gpt-4o", version: "4.0", variant: "mini", releaseType: "stable" }
+ * - gpt-4o-audio-preview → { productFamily: "gpt-4o", version: "4.0", variant: "audio", releaseType: "preview" }
  * - gpt-realtime-mini → { productFamily: "specialized", version: "0", variant: "realtime-mini", releaseType: "stable" }
  */
 export function parseOpenAIModel(model: ModelInfo): ParsedModelInfo {
   const id = model.id.toLowerCase()
 
+  // Strip provider prefix (e.g., "openai/")
+  const idWithoutProvider = id.includes('/') ? id.split('/')[1] : id
+
   // Determine release type
   let releaseType: 'stable' | 'preview' | 'exp' = 'stable'
-  if (id.includes('-preview')) {
+  if (idWithoutProvider.includes('-preview')) {
     releaseType = 'preview'
   }
 
@@ -104,111 +108,153 @@ export function parseOpenAIModel(model: ModelInfo): ParsedModelInfo {
   let version = '0'
   let variant = 'standard'
 
+  // o4 family (reasoning models)
+  if (idWithoutProvider.startsWith('o4-')) {
+    productFamily = 'o4'
+    version = 'o4'
+
+    if (idWithoutProvider.includes('-mini')) {
+      variant = 'mini'
+    } else if (idWithoutProvider.includes('-deep-research')) {
+      variant = 'deep-research'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // o3 family (reasoning models)
+  else if (idWithoutProvider.startsWith('o3-') || idWithoutProvider === 'o3') {
+    productFamily = 'o3'
+    version = 'o3'
+
+    if (idWithoutProvider.includes('-mini')) {
+      variant = 'mini'
+    } else if (idWithoutProvider.includes('-pro')) {
+      variant = 'pro'
+    } else if (idWithoutProvider.includes('-deep-research')) {
+      variant = 'deep-research'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // o1 family (reasoning models)
+  else if (idWithoutProvider.startsWith('o1-') || idWithoutProvider === 'o1') {
+    productFamily = 'o1'
+    version = 'o1'
+
+    if (idWithoutProvider.includes('-mini')) {
+      variant = 'mini'
+    } else if (idWithoutProvider.includes('-pro')) {
+      variant = 'pro'
+    } else {
+      variant = 'standard'
+    }
+  }
   // GPT-5 family
-  if (id.startsWith('gpt-5')) {
+  else if (idWithoutProvider.startsWith('gpt-5')) {
     productFamily = 'gpt-5'
     version = '5'
 
-    if (id.includes('-pro')) {
+    if (idWithoutProvider.includes('-pro')) {
       variant = 'pro'
-    } else if (id.includes('-mini')) {
+    } else if (idWithoutProvider.includes('-mini')) {
       variant = 'mini'
-    } else if (id.includes('-nano')) {
+    } else if (idWithoutProvider.includes('-nano')) {
       variant = 'nano'
-    } else if (id.includes('-search')) {
-      variant = 'search'
-    } else if (id.includes('-codex')) {
+    } else if (idWithoutProvider.includes('-search-api')) {
+      variant = 'search-api'
+    } else if (idWithoutProvider.includes('-chat-latest')) {
+      variant = 'chat-latest'
+    } else if (idWithoutProvider.includes('-codex')) {
       variant = 'codex'
     } else {
       variant = 'standard'
     }
   }
-  // GPT-4o family
-  else if (id.startsWith('gpt-4o')) {
-    productFamily = 'gpt-4o'
-    version = '4o'
-
-    if (id.includes('-mini')) {
-      variant = 'mini'
-    } else if (id.includes('-audio')) {
-      variant = 'audio'
-    } else if (id.includes('-realtime')) {
-      variant = 'realtime'
-    } else if (id.includes('-search')) {
-      variant = 'search'
-    } else if (id.includes('-transcribe')) {
-      variant = 'transcribe'
-    } else if (id.includes('-tts')) {
-      variant = 'tts'
-    } else {
-      variant = 'standard'
-    }
-  }
   // GPT-4.1 family
-  else if (id.startsWith('gpt-4.1')) {
+  else if (idWithoutProvider.startsWith('gpt-4.1')) {
     productFamily = 'gpt-4.1'
     version = '4.1'
 
-    if (id.includes('-mini')) {
+    if (idWithoutProvider.includes('-mini')) {
       variant = 'mini'
-    } else if (id.includes('-nano')) {
+    } else if (idWithoutProvider.includes('-nano')) {
       variant = 'nano'
     } else {
       variant = 'standard'
     }
   }
-  // GPT-4 family
-  else if (id.startsWith('gpt-4')) {
+  // GPT-4o family
+  else if (idWithoutProvider.startsWith('gpt-4o')) {
+    productFamily = 'gpt-4o'
+    version = '4.0'
+
+    if (idWithoutProvider.includes('-mini')) {
+      variant = 'mini'
+    } else if (idWithoutProvider.includes('-audio')) {
+      variant = 'audio'
+    } else if (idWithoutProvider.includes('-realtime')) {
+      variant = 'realtime'
+    } else if (idWithoutProvider.includes('-search')) {
+      variant = 'search'
+    } else if (idWithoutProvider.includes('-transcribe')) {
+      variant = 'transcribe'
+    } else if (idWithoutProvider.includes('-tts')) {
+      variant = 'tts'
+    } else {
+      variant = 'standard'
+    }
+  }
+  // GPT-4 family (non-4o)
+  else if (idWithoutProvider.startsWith('gpt-4')) {
     productFamily = 'gpt-4'
     version = '4'
 
-    if (id.includes('-turbo')) {
+    if (idWithoutProvider.includes('-turbo')) {
       variant = 'turbo'
     } else {
       variant = 'standard'
     }
   }
   // GPT-3.5 family
-  else if (id.startsWith('gpt-3.5')) {
+  else if (idWithoutProvider.startsWith('gpt-3.5')) {
     productFamily = 'gpt-3.5'
     version = '3.5'
 
-    if (id.includes('-turbo')) {
+    if (idWithoutProvider.includes('-turbo-instruct')) {
+      variant = 'turbo-instruct'
+    } else if (idWithoutProvider.includes('-turbo')) {
       variant = 'turbo'
-    } else if (id.includes('-instruct')) {
+    } else if (idWithoutProvider.includes('-instruct')) {
       variant = 'instruct'
     } else {
       variant = 'standard'
     }
   }
   // Specialized models (realtime, audio, image without version prefix)
-  else if (id.startsWith('gpt-realtime')) {
+  else if (idWithoutProvider.startsWith('gpt-realtime')) {
     productFamily = 'specialized'
     version = '0'
     variant = 'realtime'
-  } else if (id.startsWith('gpt-audio')) {
+  } else if (idWithoutProvider.startsWith('gpt-audio')) {
     productFamily = 'specialized'
     version = '0'
     variant = 'audio'
-  } else if (id.startsWith('gpt-image')) {
+  } else if (idWithoutProvider.startsWith('gpt-image')) {
     productFamily = 'specialized'
     version = '0'
     variant = 'image'
   }
 
-  // Create display name
-  let displayName = variant.charAt(0).toUpperCase() + variant.slice(1)
+  // Create display name - use the model's display_name or the full ID (without provider prefix)
+  let displayName = model.display_name || idWithoutProvider
 
-  // For "standard" variant, just show the model ID
-  if (variant === 'standard') {
-    displayName = model.id
-  }
+  // Detect dated models (models with date suffixes like -YYYY-MM-DD or -MMDD)
+  const hasDate = /\d{4}-\d{2}-\d{2}/.test(idWithoutProvider) || /-\d{4}$/.test(idWithoutProvider)
 
   // Create sort key: prioritize non-dated aliases, then sort by date descending
-  const hasDate = /\d{4}-\d{2}-\d{2}/.test(id)
   const releaseTypeOrder = releaseType === 'stable' ? 0 : releaseType === 'preview' ? 1 : 2
   const aliasOrder = hasDate ? 1 : 0 // Non-dated aliases come first
-  const sortKey = `${variant}-${aliasOrder}-${releaseTypeOrder}-${id}`
+  const sortKey = `${variant}-${aliasOrder}-${releaseTypeOrder}-${idWithoutProvider}`
 
   return {
     original: model,
@@ -218,6 +264,7 @@ export function parseOpenAIModel(model: ModelInfo): ParsedModelInfo {
     releaseType,
     displayName,
     sortKey,
+    isDated: hasDate,
   }
 }
 
@@ -232,25 +279,34 @@ export function parseOpenAIModel(model: ModelInfo): ParsedModelInfo {
 export function parseGeminiModel(model: ModelInfo): ParsedModelInfo {
   const id = model.id.toLowerCase()
 
+  // Strip provider prefix (e.g., "gemini/" or "google/")
+  const idWithoutProvider = id.includes('/') ? id.split('/')[1] : id
+
   // Extract release type
   let releaseType: 'stable' | 'preview' | 'exp' = 'stable'
-  if (id.includes('-exp')) {
+  if (idWithoutProvider.includes('-exp')) {
     releaseType = 'exp'
-  } else if (id.includes('-preview')) {
+  } else if (idWithoutProvider.includes('-preview')) {
     releaseType = 'preview'
   }
 
   // Extract product family (gemini, gemma, etc.) - first segment
-  const parts = id.split('-')
+  const parts = idWithoutProvider.split('-')
   const productFamily = parts[0] // "gemini" or "gemma"
 
-  // Extract version (e.g., "2.5", "2.0", "1.5")
-  const versionMatch = id.match(/^(?:gemini|gemma)-(\d+(?:\.\d+)?)/)
-  const version = versionMatch ? versionMatch[1] : '0.0'
+  // Extract version (e.g., "2.5", "2.0", "1.5", or "latest")
+  // Check for "-latest" in the model name first
+  let version: string
+  if (idWithoutProvider.includes('-latest')) {
+    version = 'latest'
+  } else {
+    const versionMatch = idWithoutProvider.match(/^(?:gemini|gemma)-(\d+(?:\.\d+)?)/)
+    version = versionMatch ? versionMatch[1] : '0.0'
+  }
 
   // Extract variant (everything between version and release type suffixes)
   let variant = 'unknown'
-  const withoutFamily = id.replace(`${productFamily}-`, '')
+  const withoutFamily = idWithoutProvider.replace(`${productFamily}-`, '')
   const withoutVersion = withoutFamily.replace(`${version}-`, '')
 
   // Remove release type suffixes and date suffixes
@@ -363,8 +419,13 @@ export function groupGeminiModels(models: ModelInfo[]): ProductFamilyGroup[] {
       versionGroups.push({ version, releaseTypeGroups })
     }
 
-    // Sort version groups by version number (descending - newest first)
+    // Sort version groups: "latest" first, then by version number descending (newest first)
     versionGroups.sort((a, b) => {
+      // "latest" always comes first
+      if (a.version === 'latest') return -1
+      if (b.version === 'latest') return 1
+
+      // Otherwise sort by version number descending
       const aNum = parseFloat(a.version)
       const bNum = parseFloat(b.version)
       return bNum - aNum // Descending order
@@ -536,10 +597,13 @@ export function groupOpenAIModels(models: ModelInfo[]): ProductFamilyGroup[] {
     // Create display name for product family
     let displayName = productFamily
     if (productFamily === 'gpt-5') displayName = 'GPT-5'
-    else if (productFamily === 'gpt-4o') displayName = 'GPT-4o'
     else if (productFamily === 'gpt-4.1') displayName = 'GPT-4.1'
+    else if (productFamily === 'gpt-4o') displayName = 'GPT-4o'
     else if (productFamily === 'gpt-4') displayName = 'GPT-4'
     else if (productFamily === 'gpt-3.5') displayName = 'GPT-3.5'
+    else if (productFamily === 'o4') displayName = 'o4'
+    else if (productFamily === 'o3') displayName = 'o3'
+    else if (productFamily === 'o1') displayName = 'o1'
     else if (productFamily === 'specialized') displayName = 'Specialized'
 
     result.push({
@@ -549,14 +613,17 @@ export function groupOpenAIModels(models: ModelInfo[]): ProductFamilyGroup[] {
     })
   }
 
-  // Sort product families by explicit order: GPT-5, GPT-4.1, GPT-4o, GPT-4, GPT-3.5, specialized
+  // Sort product families by explicit order: GPT-5, GPT-4.1, GPT-4o, GPT-4, GPT-3.5, o4, o3, o1, specialized
   const familyOrder = {
     'gpt-5': 0,
     'gpt-4.1': 1,
     'gpt-4o': 2,
     'gpt-4': 3,
     'gpt-3.5': 4,
-    'specialized': 5
+    'o4': 5,
+    'o3': 6,
+    'o1': 7,
+    'specialized': 8
   }
   result.sort((a, b) => {
     const aOrder = familyOrder[a.productFamily as keyof typeof familyOrder] ?? 99
@@ -568,11 +635,16 @@ export function groupOpenAIModels(models: ModelInfo[]): ProductFamilyGroup[] {
 }
 
 /**
- * Filter models by release type
+ * Filter models by release type and dated status
  */
 export function filterModelsByReleaseType(
   groups: ProductFamilyGroup[],
-  options: { includeStable: boolean; includePreview: boolean; includeExp: boolean }
+  options: {
+    includeStable: boolean
+    includePreview: boolean
+    includeExp: boolean
+    includeDated?: boolean
+  }
 ): ProductFamilyGroup[] {
   return groups
     .map((familyGroup) => ({
@@ -580,12 +652,21 @@ export function filterModelsByReleaseType(
       versionGroups: familyGroup.versionGroups
         .map((versionGroup) => ({
           ...versionGroup,
-          releaseTypeGroups: versionGroup.releaseTypeGroups.filter((releaseTypeGroup) => {
-            if (releaseTypeGroup.releaseType === 'stable' && options.includeStable) return true
-            if (releaseTypeGroup.releaseType === 'preview' && options.includePreview) return true
-            if (releaseTypeGroup.releaseType === 'exp' && options.includeExp) return true
-            return false
-          }),
+          releaseTypeGroups: versionGroup.releaseTypeGroups
+            .map((releaseTypeGroup) => {
+              // Filter by release type
+              if (releaseTypeGroup.releaseType === 'stable' && !options.includeStable) return null
+              if (releaseTypeGroup.releaseType === 'preview' && !options.includePreview) return null
+              if (releaseTypeGroup.releaseType === 'exp' && !options.includeExp) return null
+
+              // Filter by dated status (if includeDated is explicitly set to false)
+              const filteredModels = options.includeDated === false
+                ? releaseTypeGroup.models.filter(model => !model.isDated)
+                : releaseTypeGroup.models
+
+              return filteredModels.length > 0 ? { ...releaseTypeGroup, models: filteredModels } : null
+            })
+            .filter((group): group is ReleaseTypeGroup => group !== null),
         }))
         .filter((versionGroup) => versionGroup.releaseTypeGroups.length > 0), // Remove empty version groups
     }))
@@ -599,7 +680,7 @@ export function filterModelsByReleaseType(
 export function organizeModels(
   models: ModelInfo[],
   provider: string | null,
-  filters: { includeStable: boolean; includePreview: boolean; includeExp: boolean }
+  filters: { includeStable: boolean; includePreview: boolean; includeExp: boolean; includeDated?: boolean }
 ): ProductFamilyGroup[] {
   if (provider === 'gemini') {
     const groups = groupGeminiModels(models)

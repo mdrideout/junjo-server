@@ -11,10 +11,13 @@ import type { ModelInfo } from '../fetch/model-discovery'
 import {
   organizeModels,
   type ProductFamilyGroup,
-  type ParsedModelInfo,
 } from '../utils/model-grouping'
-import clsx from 'clsx'
 import RefreshButton from './RefreshButton'
+import ModelCard from './model-selector/ModelCard'
+import OriginalModelCard from './model-selector/OriginalModelCard'
+import GeminiModelList from './model-selector/GeminiModelList'
+import OpenAIModelList from './model-selector/OpenAIModelList'
+import AnthropicModelList from './model-selector/AnthropicModelList'
 
 interface ModelSelectorModalProps {
   isOpen: boolean
@@ -45,6 +48,7 @@ export default function ModelSelectorModal({
   const [includeStable, setIncludeStable] = useState(true)
   const [includePreview, setIncludePreview] = useState(false)
   const [includeExp, setIncludeExp] = useState(false)
+  const [includeDated, setIncludeDated] = useState(false) // Dated models default to off
 
   // Find the original model info
   const originalModel =
@@ -52,8 +56,8 @@ export default function ModelSelectorModal({
 
   // Group and filter models
   const productFamilyGroups = useMemo(
-    () => organizeModels(models, provider, { includeStable, includePreview, includeExp }),
-    [models, provider, includeStable, includePreview, includeExp]
+    () => organizeModels(models, provider, { includeStable, includePreview, includeExp, includeDated }),
+    [models, provider, includeStable, includePreview, includeExp, includeDated]
   )
 
   const handleSelectModel = (modelId: string) => {
@@ -83,7 +87,7 @@ export default function ModelSelectorModal({
         {(provider === 'gemini' || provider === 'openai') && (
           <div className="mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-700">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -111,6 +115,17 @@ export default function ModelSelectorModal({
                       className="w-4 h-4 text-indigo-600 border-zinc-300 rounded focus:ring-indigo-500"
                     />
                     <span className="text-sm text-zinc-700 dark:text-zinc-300">Experimental</span>
+                  </label>
+                )}
+                {provider === 'openai' && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeDated}
+                      onChange={(e) => setIncludeDated(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-zinc-300 rounded focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Dated Models</span>
                   </label>
                 )}
               </div>
@@ -203,162 +218,53 @@ function ProductFamilySection({
   onSelectModel,
   provider,
 }: ProductFamilySectionProps) {
+  if (provider === 'gemini') {
+    return (
+      <GeminiModelList
+        familyGroup={familyGroup}
+        selectedModel={selectedModel}
+        onSelectModel={onSelectModel}
+      />
+    )
+  }
+
+  if (provider === 'openai') {
+    return (
+      <OpenAIModelList
+        familyGroup={familyGroup}
+        selectedModel={selectedModel}
+        onSelectModel={onSelectModel}
+      />
+    )
+  }
+
+  if (provider === 'anthropic') {
+    return (
+      <AnthropicModelList
+        familyGroup={familyGroup}
+        selectedModel={selectedModel}
+        onSelectModel={onSelectModel}
+      />
+    )
+  }
+
+  // Default rendering for unknown providers
   return (
     <div>
-      {/* Product Family Header */}
-      {(provider === 'gemini' || provider === 'anthropic' || provider === 'openai') && (
-        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-3">
-          {familyGroup.displayName}
-        </h3>
-      )}
-
-      {/* Version/Variant Groups */}
-      {familyGroup.versionGroups.map((versionGroup) => (
-        <div key={versionGroup.version} className="mb-4 last:mb-0">
-          {/* Version Header (Gemini) or Variant Header (OpenAI) */}
-          {provider === 'gemini' && versionGroup.version && (
-            <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
-              {versionGroup.version === '0.0' ? 'Latest' : `Version ${versionGroup.version}`}
-            </p>
-          )}
-          {provider === 'openai' && versionGroup.version && (
-            <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">
-              {versionGroup.version.charAt(0).toUpperCase() + versionGroup.version.slice(1)}
-            </p>
-          )}
-
-          {/* Release Type Groups */}
-          {versionGroup.releaseTypeGroups.map((releaseTypeGroup) => (
-            <div key={releaseTypeGroup.releaseType} className="mb-3 last:mb-0">
-              {/* Release Type Header (only show if needed) */}
-              {(provider === 'gemini' || (provider === 'openai' && versionGroup.releaseTypeGroups.length > 1)) && (
-                <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-2 pl-2">
-                  {releaseTypeGroup.displayName}
-                </p>
-              )}
-
-              {/* Model Cards */}
-              <div className="grid grid-cols-1 gap-2">
-                {releaseTypeGroup.models.map((model) => (
-                  <ModelCard
-                    key={model.original.id}
-                    model={model}
-                    isSelected={model.original.id === selectedModel}
-                    onSelect={() => onSelectModel(model.original.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-interface ModelCardProps {
-  model: ParsedModelInfo
-  isSelected: boolean
-  onSelect: () => void
-}
-
-function ModelCard({ model, isSelected, onSelect }: ModelCardProps) {
-  const { original, displayName } = model
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={clsx(
-        'text-left p-3 rounded-lg border transition-colors cursor-pointer',
-        isSelected
-          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
-          : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
-      )}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-baseline gap-1">
-            <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">{displayName}</span>{' '}
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">{original.id}</span>
-          </div>
-
-          <div className="flex gap-3 mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {original.max_tokens && (
-              <span>
-                <span className="font-medium">Max tokens:</span> {original.max_tokens.toLocaleString()}
-              </span>
-            )}
-            {original.supports_reasoning && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                Reasoning
-              </span>
-            )}
-            {original.supports_vision && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                Vision
-              </span>
-            )}
-          </div>
-        </div>
-        {isSelected && (
-          <div className="ml-3 flex-shrink-0">
-            <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                <path d="M10 3L4.5 8.5L2 6" stroke="currentColor" strokeWidth="2" fill="none" />
-              </svg>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 gap-2">
+        {familyGroup.versionGroups.flatMap((vg) =>
+          vg.releaseTypeGroups.flatMap((rtg) =>
+            rtg.models.map((model) => (
+              <ModelCard
+                key={model.original.id}
+                model={model}
+                isSelected={model.original.id === selectedModel}
+                onSelect={() => onSelectModel(model.original.id)}
+              />
+            ))
+          )
         )}
       </div>
-    </button>
-  )
-}
-
-interface OriginalModelCardProps {
-  model: ModelInfo
-  onSelect: () => void
-}
-
-function OriginalModelCard({ model, onSelect }: OriginalModelCardProps) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="w-full text-left p-3 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-baseline gap-1">
-            <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
-              {model.display_name || model.id}
-            </span>
-          </div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{model.id}</div>
-          <div className="flex gap-3 mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {model.max_tokens && (
-              <span>
-                <span className="font-medium">Max tokens:</span> {model.max_tokens.toLocaleString()}
-              </span>
-            )}
-            {model.supports_reasoning && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                Reasoning
-              </span>
-            )}
-            {model.supports_vision && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                Vision
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="ml-3 flex-shrink-0">
-          <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 font-medium">
-            Use Original
-          </span>
-        </div>
-      </div>
-    </button>
+    </div>
   )
 }
