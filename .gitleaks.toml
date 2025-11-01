@@ -1,0 +1,33 @@
+# Gitleaks configuration for Junjo Server
+# https://github.com/gitleaks/gitleaks
+
+title = "Junjo Server Gitleaks Config"
+
+[extend]
+# Use default gitleaks rules
+useDefault = true
+
+[allowlist]
+description = "Allowlist test fixtures and known false positives"
+
+# Allowlist test files with hardcoded test API keys
+paths = [
+    '''backend/app/features/internal_auth/test_.*\.py''',
+    '''backend_python/app/features/internal_auth/test_.*\.py''',
+    '''.*test_.*\.py''',
+]
+
+# Allowlist specific test key patterns
+regexes = [
+    '''9hppr92Y5kZqx4EvQ0oLRFzJ0LGozRO3oIIWrcx6B4qCmI59A8eFJFtbORy8LXBz''',  # Test API key fixture
+    '''test_api_key_.*''',  # Test key patterns
+    '''production_test_key''',  # Test key variable names
+]
+
+# Allowlist by commit message patterns
+[allowlist.commits]
+# Allow commits that explicitly mention test fixtures
+regexes = [
+    '''test.*fixture''',
+    '''test.*data''',
+]
