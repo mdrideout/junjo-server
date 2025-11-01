@@ -24,10 +24,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.common.responses import HealthResponse
 from app.config.logger import setup_logging
 from app.config.settings import settings
-from app.features.api_keys import router as api_keys_router
-from app.features.auth import router as auth_router
-from app.features.llm_playground import router as llm_playground_router
-from app.features.otel_spans import router as otel_spans_router
+from app.features.api_keys.router import router as api_keys_router
+from app.features.auth.router import router as auth_router
+from app.features.llm_playground.router import router as llm_playground_router
+from app.features.otel_spans.router import router as otel_spans_router
 from app.grpc_server import start_grpc_server_background, stop_grpc_server
 
 # Set up logging before anything else

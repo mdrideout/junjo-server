@@ -806,6 +806,88 @@ Within each feature, code is organized by **layer** (handler, service, repositor
 
 Each file, function, and module should have one clear purpose. This makes code easier to understand, test, and modify.
 
+### Import Organization
+
+All imports must be placed at the top of the file, immediately after the module docstring (if present).
+
+**Structure (all languages):**
+1. Module/file docstring (if any)
+2. Standard library imports
+3. Third-party library imports
+4. Local application imports
+
+**Python:**
+```python
+"""Module docstring describing the file's purpose."""
+
+# Standard library
+import asyncio
+import os
+from typing import Optional
+
+# Third-party
+from fastapi import APIRouter, Depends
+from loguru import logger
+
+# Local
+from app.config.settings import settings
+from app.features.auth.dependencies import CurrentUserEmail
+
+# Code starts here
+router = APIRouter()
+```
+
+**Go:**
+```go
+// Package comment
+package apikeys
+
+import (
+    // Standard library
+    "context"
+    "fmt"
+
+    // Third-party
+    "github.com/labstack/echo/v4"
+
+    // Local
+    "junjo-server/backend/db"
+    "junjo-server/backend/utils"
+)
+
+// Code starts here
+func Handler() { ... }
+```
+
+**TypeScript:**
+```typescript
+/**
+ * Module docstring describing the file's purpose.
+ */
+
+// React/external libraries
+import React, { useState } from 'react'
+import { z } from 'zod'
+
+// Internal imports
+import { fetchAPIKeys } from './fetch/get-api-keys'
+import { useAppSelector } from '@/hooks/redux'
+
+// Code starts here
+export function Component() { ... }
+```
+
+**Rationale:**
+- Provides immediate visibility of dependencies
+- Makes circular dependency issues obvious
+- Follows language community conventions
+- Enables static analysis tools to work effectively
+- Improves code readability
+
+**Exceptions:**
+- Lazy imports for performance (rare, must be documented)
+- Conditional imports in dynamic scenarios (must be justified)
+
 ## Backend (Go) Organization
 
 The backend is written in Go and follows Go community idioms and conventions.
@@ -1798,6 +1880,66 @@ backend_python/app/features/
 - **Package names**: Singular (e.g., `auth` not `auths`)
 - **File names**: Use snake_case (e.g., `router.py`, `test_router.py`)
 - **Test files**: Co-located with implementation using `test_` prefix (e.g., `test_router.py` next to `router.py`)
+
+### Python Package Structure and `__init__.py` Usage
+
+Python 3.3+ introduced **namespace packages**, which allow packages to work without `__init__.py` files. Junjo Server follows modern Python conventions by minimizing `__init__.py` usage.
+
+**Guideline:** Minimize or eliminate `__init__.py` files unless they serve a functional purpose.
+
+**When to OMIT `__init__.py`:**
+- Empty files that only mark directories as packages
+- Files containing only docstrings
+- Files with empty `__all__` lists
+- Packages where explicit imports are preferred
+
+**When to KEEP `__init__.py`:**
+- Files that aggregate imports for developer convenience (use sparingly)
+- Files that contain initialization code required on package import
+- Files that register models or plugins (e.g., for Alembic auto-detection)
+
+**Example - Critical use case:**
+```python
+# app/db_sqlite/__init__.py - MUST KEEP
+"""Database package.
+
+Imports all models so Alembic can detect them for autogenerate.
+IMPORTANT: Every new model must be imported here for Alembic to work.
+"""
+
+from app.db_sqlite.base import Base  # noqa: F401
+from app.db_sqlite.users.models import UserTable  # noqa: F401
+```
+
+**Benefits of namespace packages:**
+- Reduced boilerplate (Junjo backend removed 15 unnecessary `__init__.py` files)
+- Cleaner codebase following Python 3.13 idioms
+- Explicit imports (developers import exactly what they need)
+- Less maintenance burden
+
+**Import pattern with namespace packages:**
+```python
+# ✅ Explicit module imports (preferred)
+from app.features.auth.router import router as auth_router
+from app.features.otel_spans.repository import SpanRepository
+
+# ❌ Avoid package-level imports (unless __init__.py provides them)
+from app.features.auth import router  # Only works with __init__.py
+```
+
+**Migration from package-level to explicit imports:**
+
+When removing `__init__.py` files, update imports to reference the specific module:
+
+```python
+# Before (with __init__.py that re-exports router)
+from app.features.auth import router as auth_router
+
+# After (namespace package without __init__.py)
+from app.features.auth.router import router as auth_router
+```
+
+This pattern makes dependencies explicit and improves code clarity.
 
 ### Layer Responsibilities
 
