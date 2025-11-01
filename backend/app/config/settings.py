@@ -14,6 +14,29 @@ from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def find_env_file() -> str:
+    """
+    Find .env file in current directory or parent directory.
+
+    This allows the app to work whether running from:
+    - Repository root: /Users/matt/repos/junjo-server/
+    - Backend directory: /Users/matt/repos/junjo-server/backend/
+
+    Returns:
+        Path to .env file (current dir, parent dir, or default ".env")
+    """
+    current = Path.cwd() / ".env"
+    parent = Path.cwd().parent / ".env"
+
+    if current.exists():
+        return str(current)
+    elif parent.exists():
+        return str(parent)
+    else:
+        # Fallback to default (will use environment variables only)
+        return ".env"
+
+
 class DatabaseSettings(BaseSettings):
     """Database configuration"""
 
@@ -62,7 +85,7 @@ class DatabaseSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="DB_",
-        env_file=".env",
+        env_file=find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -143,7 +166,7 @@ class SessionCookieSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="JUNJO_",
-        env_file=".env",
+        env_file=find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -177,7 +200,7 @@ class IngestionServiceSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="INGESTION_",
-        env_file=".env",
+        env_file=find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -230,7 +253,7 @@ class SpanIngestionSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="SPAN_",
-        env_file=".env",
+        env_file=find_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -262,7 +285,7 @@ class LLMSettings(BaseSettings):
     ]
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=find_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -378,7 +401,7 @@ class AppSettings(BaseSettings):
         return v
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=find_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

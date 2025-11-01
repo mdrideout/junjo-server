@@ -1,145 +1,155 @@
-# Junjo Server - Python Backend
+# Junjo Server - Backend Service
 
-Python/FastAPI backend for the Junjo Server LLM observability platform.
+FastAPI backend service for the Junjo Server LLM observability platform.
 
-## Technology Stack
+## Overview
 
-- **Python 3.13+** (latest stable)
-- **FastAPI** (async web framework)
-- **Pydantic v2+** (data validation and settings)
-- **Loguru** (structured logging)
-- **uv** (fast package management)
+The backend service provides:
+- **HTTP REST API** for frontend and programmatic access
+- **User authentication** with session management
+- **LLM playground** for testing prompts across providers (OpenAI, Anthropic, Gemini)
+- **Span querying & analytics** using DuckDB
+- **Internal gRPC server** for authentication (port 50053)
 
-## Quick Start
+**Tech Stack**: Python 3.13+, FastAPI, SQLAlchemy, SQLite (metadata), DuckDB (analytics), Loguru
 
-### Prerequisites
+---
 
-- Python 3.13+
-- [uv](https://github.com/astral-sh/uv) (recommended)
+## Running the Backend
 
-### Installation
+### Primary Method: Docker Compose (Recommended)
+
+**For running the full Junjo Server stack**, see the [root README.md](../README.md) Quick Start guide. The backend is part of the complete Docker Compose setup with all three services (backend, ingestion, frontend).
+
+```bash
+# From repository root
+docker compose up -d
+
+# View backend logs
+docker compose logs -f junjo-server-backend
+
+# Restart backend only
+docker compose restart junjo-server-backend
+```
+
+The backend will be available at:
+- **API**: http://localhost:1323
+- **Health Check**: http://localhost:1323/health
+- **gRPC (internal)**: localhost:50053
+
+---
+
+### Secondary Method: Direct Execution with uv (Development)
+
+Run the backend directly for development, testing, or debugging. This is useful when:
+- Working on backend-specific features
+- Running integration tests locally
+- Debugging without Docker overhead
+
+#### Prerequisites
+
+- **Python 3.13+**
+- **[uv](https://github.com/astral-sh/uv)** (fast package manager)
+- **`.env` file** configured (see root README)
+
+#### Setup
 
 ```bash
 # Navigate to backend directory
-cd backend_python
+cd backend
 
-# Create virtual environment with Python 3.13
-uv venv --python 3.13
-
-# Install dependencies including dev tools (pytest, ruff, mypy)
+# Install dependencies (includes dev tools: pytest, ruff)
 uv sync --all-extras
 
 # Or install only production dependencies
 uv sync
 ```
 
-**Note:** Use `--all-extras` to install development dependencies (pytest, pytest-asyncio, ruff, mypy). This is required for running tests and linters.
+**Note**: `--all-extras` installs development dependencies (pytest, pytest-asyncio, httpx, ruff). Required for running tests and linters.
 
-### Running the Development Server
+#### Start the Backend
 
-#### Option 1: Using uv run (Recommended)
 ```bash
-# Start the server with hot reload
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 1324
-```
+# Option 1: Using uv run (recommended)
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 1323
 
-#### Option 2: Using Python directly
-```bash
-# Start via main module
+# Option 2: Via main module
 uv run python -m app.main
-```
 
-#### Option 3: Using the virtual environment directly
-```bash
-# Activate virtual environment
+# Option 3: With activated virtual environment
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Run uvicorn
-uvicorn app.main:app --reload --host 0.0.0.0 --port 1324
+uvicorn app.main:app --reload --host 0.0.0.0 --port 1323
 ```
 
-The API will be available at:
-- **API**: http://localhost:1324
-- **Interactive Docs (Swagger)**: http://localhost:1324/docs
-- **Alternative Docs (ReDoc)**: http://localhost:1324/redoc
-- **Health Check**: http://localhost:1324/health
-- **Ping**: http://localhost:1324/ping
+The backend will be available at:
+- **API**: http://localhost:1323
+- **Health Check**: http://localhost:1323/health
 
-### Testing Endpoints
+**Important**: The backend automatically starts its internal gRPC server on port 50053 via the FastAPI lifespan manager. No additional steps needed.
+
+#### Quick Test
 
 ```bash
-# Test ping endpoint
-curl http://localhost:1324/ping
-
 # Test health endpoint
-curl http://localhost:1324/health
+curl http://localhost:1323/health
 
-# Test root endpoint
-curl http://localhost:1324/
+# Test ping endpoint
+curl http://localhost:1323/ping
 ```
 
-### Running Tests
+---
 
-The test suite includes both unit tests (fast, isolated) and integration tests (require external services).
+## Testing
 
-#### Quick Test Commands
+### Test Categories
 
-```bash
-# Run all tests
-uv run pytest
-
-# Run only unit tests (fast, no external dependencies)
-uv run pytest -m "not integration"
-
-# Run only integration tests (requires services running)
-uv run pytest -m "integration"
-
-# Run tests with verbose output
-uv run pytest -v
-
-# Run specific test file
-uv run pytest tests/test_main.py -v
-```
-
-#### Test Categories
-
-Tests are organized with pytest markers:
+Tests use pytest markers for organization:
 
 - **`unit`**: Fast, isolated unit tests (no external dependencies)
-- **`integration`**: Integration tests (require database, services)
+- **`integration`**: Integration tests (require running backend service)
 - **`requires_grpc_server`**: Tests requiring gRPC server on port 50053
-- **`requires_gemini_api`**: Tests requiring `GEMINI_API_KEY` in environment
-- **`requires_openai_api`**: Tests requiring `OPENAI_API_KEY` in environment
-- **`requires_anthropic_api`**: Tests requiring `ANTHROPIC_API_KEY` in environment
-- **`security`**: Security-focused tests (auth bypass, SQL injection)
+- **`requires_gemini_api`**: Tests requiring `GEMINI_API_KEY` environment variable
+- **`requires_openai_api`**: Tests requiring `OPENAI_API_KEY` environment variable
+- **`requires_anthropic_api`**: Tests requiring `ANTHROPIC_API_KEY` environment variable
+- **`security`**: Security tests (auth bypass, SQL injection)
 - **`concurrency`**: Concurrency and race condition tests
 - **`error_recovery`**: Error recovery and resilience tests
 
-#### Running Specific Test Categories
+### Running Tests
+
+#### Unit Tests (Fast, No Dependencies)
 
 ```bash
-# Run only Gemini API tests (requires GEMINI_API_KEY in .env)
-uv run pytest -m "requires_gemini_api"
+# Run all unit tests (excludes integration tests)
+uv run pytest -m "not integration" -v
 
-# Run only gRPC server tests (requires gRPC server running)
-uv run pytest -m "requires_grpc_server"
+# Run specific test file
+uv run pytest tests/test_main.py -v
 
-# Run all tests except those requiring external APIs
-uv run pytest -m "not (requires_gemini_api or requires_openai_api or requires_anthropic_api)"
-
-# Run security tests
-uv run pytest -m "security"
-
-# Run concurrency tests
-uv run pytest -m "concurrency"
+# Run with coverage
+uv run pytest -m "not integration" --cov=app --cov-report=term-missing
 ```
 
-#### Integration Tests Setup
+#### Integration Tests (Requires Backend Running)
 
-Integration tests require services to be running:
+Integration tests require the backend service to be running (gRPC server on port 50053).
+
+**Option 1: Run Backend Service Directly** (Recommended for local development)
 
 ```bash
-# Terminal 1: Start services
+# Terminal 1: Start backend
+cd backend
+uv run uvicorn app.main:app --host 0.0.0.0 --port 1323
+
+# Terminal 2: Run integration tests
+cd backend
+uv run pytest -m "integration" -v
+```
+
+**Option 2: Use Docker Compose** (Matches CI environment)
+
+```bash
+# Terminal 1: Start all services
 docker compose up --build
 
 # Terminal 2: Run integration tests
@@ -147,70 +157,39 @@ cd backend
 uv run pytest -m "integration" -v
 ```
 
-#### Coverage Reports
+#### LLM Playground Tests (Requires API Keys)
 
 ```bash
-# Run with coverage report
-uv run pytest --cov=app --cov-report=term-missing
+# Run Gemini tests (requires GEMINI_API_KEY in .env)
+uv run pytest -m "requires_gemini_api" -v
 
-# Generate HTML coverage report
-uv run pytest --cov=app --cov-report=html
-# Then open: open htmlcov/index.html
+# Run OpenAI tests (requires OPENAI_API_KEY in .env)
+uv run pytest -m "requires_openai_api" -v
 
-# Coverage for unit tests only
-uv run pytest -m "not integration" --cov=app --cov-report=html
+# Run Anthropic tests (requires ANTHROPIC_API_KEY in .env)
+uv run pytest -m "requires_anthropic_api" -v
 ```
 
-#### GitHub Actions
+#### All Tests
 
-Tests run automatically on pull requests via GitHub Actions:
+```bash
+# Run everything (requires backend running + API keys)
+uv run pytest -v
+```
+
+### GitHub Actions CI
+
+Tests run automatically on pull requests:
 - **Unit tests**: Fast execution with no external dependencies
 - **Integration tests**: Run with Docker Compose and GitHub Secrets for API keys
 
-See `.github/workflows/test.yml` for CI/CD configuration.
+See [`.github/workflows/test.yml`](../.github/workflows/test.yml) for CI configuration.
 
-## Project Structure
-
-```
-backend_python/
-├── app/
-│   ├── config/          # Settings and configuration
-│   ├── features/        # Feature-based modules
-│   ├── common/          # Shared utilities
-│   └── main.py          # FastAPI app
-├── tests/               # Tests
-└── pyproject.toml       # Dependencies
-```
-
-## Configuration
-
-Configuration is managed via environment variables (see `.env.example`).
-
-Settings are loaded using Pydantic Settings with the following precedence:
-1. Environment variables
-2. `.env` file
-3. Default values in `app/config/settings.py`
-
-### Key Configuration Variables
-
-```bash
-# Application
-DEBUG=true                           # Enable debug logging
-PORT=1324                           # Server port (1324 for dev, 1323 for production)
-CORS_ORIGINS=["http://localhost:5151"]  # Allowed CORS origins
-
-# Database
-DB_SQLITE_PATH=./dbdata/junjo.db    # SQLite database path
-DB_DUCKDB_PATH=./dbdata/traces.duckdb  # DuckDB database path
-
-# Ingestion Service
-INGESTION_HOST=localhost             # Ingestion service host
-INGESTION_PORT=50052                # Ingestion service port
-```
+---
 
 ## Development Tools
 
-### Linting
+### Linting and Formatting
 
 ```bash
 # Run ruff linter
@@ -223,58 +202,95 @@ uv run ruff check app/ --fix
 uv run ruff format app/
 ```
 
-### Type Checking
+### Code Quality Checks
 
 ```bash
-# Run mypy type checker
-uv run mypy app/
+# Run all checks before committing
+uv run ruff check app/
+uv run pytest -m "not integration" -v
 ```
 
-## Docker
+---
 
-### Building
+## Project Structure
+
+```
+backend/
+├── app/
+│   ├── config/                 # Settings and configuration
+│   │   ├── settings.py         # Pydantic settings (env vars)
+│   │   └── logger.py           # Loguru setup
+│   ├── features/               # Feature modules
+│   │   ├── auth/               # Authentication & sessions
+│   │   ├── api_keys/           # API key management
+│   │   ├── llm_playground/     # LLM playground
+│   │   ├── otel_spans/         # Span querying
+│   │   └── span_ingestion/     # Span ingestion from gRPC
+│   ├── common/                 # Shared utilities
+│   │   ├── audit.py            # Audit logging
+│   │   └── responses.py        # Common response models
+│   ├── db_sqlite/              # SQLite (users, API keys)
+│   ├── db_duckdb/              # DuckDB (span analytics)
+│   ├── grpc_server.py          # Internal gRPC server
+│   └── main.py                 # FastAPI app entry point
+├── tests/                      # Test suite
+│   ├── test_main.py            # Basic tests
+│   ├── integration/            # Integration tests
+│   ├── security/               # Security tests
+│   └── error_recovery/         # Error recovery tests
+├── pyproject.toml              # Dependencies & tool config
+└── README.md                   # This file
+```
+
+---
+
+## Configuration
+
+The backend reads configuration from environment variables (`.env` file at repository root).
+
+**See the [root README.md](../README.md#configuration) for complete configuration details.**
+
+### Key Backend-Specific Variables
 
 ```bash
-# Build production image
-docker build -t junjo-backend:latest .
+# Ports
+PORT=1323                       # Backend HTTP port
+GRPC_PORT=50053                 # Internal gRPC port
 
-# Build development image with hot reload
-docker build -t junjo-backend:dev --target dev .
+# Database paths
+DB_SQLITE_PATH=/dbdata/sqlite/junjo.db
+DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
+
+# Logging
+LOG_LEVEL=info                  # debug | info | warn | error
+LOG_FORMAT=text                 # json | text
+
+# LLM API keys (optional, for playground)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
 ```
 
-### Running
+Configuration is loaded using **Pydantic Settings** with precedence:
+1. Environment variables
+2. `.env` file
+3. Default values in `app/config/settings.py`
 
-```bash
-# Run production container
-docker run -p 1324:1324 --env-file .env junjo-backend:latest
-
-# Run development container with volume mount
-docker run -p 1324:1324 \
-  -v $(pwd)/app:/app/app \
-  --env-file .env \
-  junjo-backend:dev
-```
-
-### Using Docker Compose
-
-```bash
-# Start Python backend alongside Go backend
-docker compose -f ../docker-compose.dev.yml up junjo-server-backend-python
-
-# View logs
-docker compose -f ../docker-compose.dev.yml logs -f junjo-server-backend-python
-```
+---
 
 ## Troubleshooting
 
 ### Port Already in Use
 
 ```bash
-# Check what's using port 1324
-lsof -i :1324
+# Check what's using port 1323
+lsof -i :1323
 
 # Kill the process
 kill -9 <PID>
+
+# Or change the port in .env
+PORT=1324
 ```
 
 ### Module Import Errors
@@ -282,11 +298,11 @@ kill -9 <PID>
 If you see `ModuleNotFoundError: No module named 'app'`:
 
 ```bash
-# Make sure you're in the backend_python directory
-cd backend_python
+# Ensure you're in the backend directory
+cd backend
 
-# Ensure dependencies are installed
-uv sync
+# Reinstall dependencies
+uv sync --all-extras
 
 # Run with PYTHONPATH set
 PYTHONPATH=. uv run uvicorn app.main:app --reload
@@ -295,26 +311,33 @@ PYTHONPATH=. uv run uvicorn app.main:app --reload
 ### Virtual Environment Issues
 
 ```bash
-# Remove existing venv and recreate with Python 3.13
+# Remove and recreate virtual environment
 rm -rf .venv
 uv venv --python 3.13
-uv sync
+uv sync --all-extras
 ```
 
-## CI/CD Notes
+### Integration Test Failures
 
-For automated testing in CI/CD pipelines:
+**Symptom**: `pytest -m "integration"` fails with connection errors
+
+**Solution**: Ensure backend is running on port 1323 with gRPC server on port 50053
 
 ```bash
-# Install dependencies (including dev tools)
-uv sync --all-extras
+# Terminal 1: Start backend
+uv run uvicorn app.main:app --host 0.0.0.0 --port 1323
 
-# Run linter
-uv run ruff check app/
+# Terminal 2: Verify gRPC server is running
+lsof -i :50053
 
-# Run type checker
-uv run mypy app/
-
-# Run tests with coverage
-uv run pytest --cov=app --cov-fail-under=80
+# Terminal 2: Run tests
+uv run pytest -m "integration" -v
 ```
+
+---
+
+## Additional Resources
+
+- **[Root README](../README.md)** - Full Junjo Server documentation
+- **[Deployment Guide](../docs/DEPLOYMENT.md)** - Production deployment instructions
+- **[Junjo Python Library](https://github.com/mdrideout/junjo)** - AI graph workflow framework
