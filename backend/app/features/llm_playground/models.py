@@ -8,7 +8,7 @@ Strategy:
 """
 
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import httpx
 from litellm import supports_reasoning
@@ -33,9 +33,9 @@ class ModelsCache:
             ttl_seconds: Time-to-live in seconds (default: 900 = 15 minutes)
         """
         self.ttl_seconds = ttl_seconds
-        self._cache: Dict[str, Tuple[List[ModelInfo], float]] = {}
+        self._cache: dict[str, tuple[list[ModelInfo], float]] = {}
 
-    def get(self, provider: str) -> Optional[List[ModelInfo]]:
+    def get(self, provider: str) -> list[ModelInfo] | None:
         """
         Get cached models if not expired.
 
@@ -59,7 +59,7 @@ class ModelsCache:
         logger.debug(f"Cache hit for {provider}")
         return models
 
-    def set(self, provider: str, models: List[ModelInfo]) -> None:
+    def set(self, provider: str, models: list[ModelInfo]) -> None:
         """
         Cache models with current timestamp.
 
@@ -70,7 +70,7 @@ class ModelsCache:
         self._cache[provider] = (models, time.time())
         logger.debug(f"Cached {len(models)} models for {provider}")
 
-    def clear(self, provider: Optional[str] = None) -> None:
+    def clear(self, provider: str | None = None) -> None:
         """
         Clear cache for a provider or all providers.
 
@@ -89,7 +89,7 @@ class ModelsCache:
 models_cache = ModelsCache()
 
 
-async def fetch_openai_models() -> List[ModelInfo]:
+async def fetch_openai_models() -> list[ModelInfo]:
     """
     Fetch models from OpenAI API.
 
@@ -109,9 +109,9 @@ async def fetch_openai_models() -> List[ModelInfo]:
             timeout=10.0,
         )
         response.raise_for_status()
-        data: Dict[str, Any] = response.json()
+        data: dict[str, Any] = response.json()
 
-        models: List[ModelInfo] = []
+        models: list[ModelInfo] = []
         for model in data.get("data", []):
             model_id: str = model.get("id", "")
 
@@ -137,7 +137,7 @@ async def fetch_openai_models() -> List[ModelInfo]:
         return models
 
 
-async def fetch_anthropic_models() -> List[ModelInfo]:
+async def fetch_anthropic_models() -> list[ModelInfo]:
     """
     Fetch models from Anthropic API.
 
@@ -157,9 +157,9 @@ async def fetch_anthropic_models() -> List[ModelInfo]:
             timeout=10.0,
         )
         response.raise_for_status()
-        data: Dict[str, Any] = response.json()
+        data: dict[str, Any] = response.json()
 
-        models: List[ModelInfo] = []
+        models: list[ModelInfo] = []
         for model in data.get("data", []):
             if model.get("type") == "model":
                 model_id: str = model.get("id", "")
@@ -183,7 +183,7 @@ async def fetch_anthropic_models() -> List[ModelInfo]:
         return models
 
 
-async def fetch_gemini_models() -> List[ModelInfo]:
+async def fetch_gemini_models() -> list[ModelInfo]:
     """
     Fetch models from Google AI Studio API.
 
@@ -202,9 +202,9 @@ async def fetch_gemini_models() -> List[ModelInfo]:
             timeout=10.0,
         )
         response.raise_for_status()
-        data: Dict[str, Any] = response.json()
+        data: dict[str, Any] = response.json()
 
-        models: List[ModelInfo] = []
+        models: list[ModelInfo] = []
         for model in data.get("models", []):
             model_name: str = model.get("name", "").replace("models/", "")
 
@@ -232,7 +232,7 @@ async def fetch_gemini_models() -> List[ModelInfo]:
         return models
 
 
-async def get_models_for_provider(provider: str, force_refresh: bool = False) -> List[ModelInfo]:
+async def get_models_for_provider(provider: str, force_refresh: bool = False) -> list[ModelInfo]:
     """
     Get models for provider using 2-tier strategy.
 

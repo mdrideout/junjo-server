@@ -5,8 +5,6 @@ properly rejects unauthorized access attempts.
 """
 
 import asyncio
-import time
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from httpx import ASGITransport, AsyncClient

@@ -5,7 +5,7 @@ connection errors, transaction failures, and recovery scenarios.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -160,13 +160,13 @@ async def test_database_query_timeout_handling(mock_authenticated_user):
         # Create a task that will timeout
         try:
             # Set a reasonable timeout
-            result = await asyncio.wait_for(
+            await asyncio.wait_for(
                 APIKeyService.list_api_keys(authenticated_user=mock_authenticated_user),
                 timeout=1.0
             )
             # Should not reach here
             assert False, "Expected timeout"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Expected timeout
             pass
 

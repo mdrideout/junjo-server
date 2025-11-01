@@ -29,7 +29,7 @@ async def test_gemini():
         assert response.choices[0].message.content is not None, "Message content is None"
         assert len(response.choices[0].message.content) > 0, "Message content is empty"
 
-        print(f"\n✓ SUCCESS!")
+        print("\n✓ SUCCESS!")
         print(f"  Model: {response.model}")
         print(f"  Response: {response.choices[0].message.content}")
         print(f"  Tokens: {response.usage.total_tokens if response.usage else 'N/A'}")
@@ -37,7 +37,7 @@ async def test_gemini():
         return 0
 
     except Exception as e:
-        print(f"\n✗ FAILED!")
+        print("\n✗ FAILED!")
         print(f"  Error: {e}")
         import traceback
         traceback.print_exc()

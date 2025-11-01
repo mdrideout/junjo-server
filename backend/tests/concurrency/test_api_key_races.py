@@ -30,7 +30,7 @@ async def test_concurrent_api_key_creation(mock_authenticated_user):
                 name=f"Concurrent Key {i}",
                 authenticated_user=mock_authenticated_user
             )
-        except Exception as e:
+        except Exception:
             return None
 
     # Create 100 keys concurrently
@@ -74,7 +74,7 @@ async def test_concurrent_key_read_and_delete(mock_authenticated_user):
         """Read the key."""
         try:
             return await APIKeyRepository.get_by_id(created.id)
-        except Exception as e:
+        except Exception:
             return None
 
     async def delete_key():
@@ -222,7 +222,7 @@ async def test_concurrent_delete_same_key(mock_authenticated_user):
 
     # Count successes (True) and failures (False or exception)
     successes = [r for r in results if r is True]
-    failures = [r for r in results if r is False or isinstance(r, str)]
+    [r for r in results if r is False or isinstance(r, str)]
 
     # At least one should succeed
     assert len(successes) >= 1

@@ -9,7 +9,7 @@ LiteLLM provides:
 """
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from litellm import acompletion
 from loguru import logger
@@ -46,8 +46,8 @@ class LLMService:
 
     @staticmethod
     def _prepare_response_format(
-        json_mode: bool, json_schema: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+        json_mode: bool, json_schema: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """
         Prepare response_format parameter for LiteLLM.
 
@@ -104,7 +104,7 @@ class LLMService:
             # Set up LiteLLM environment variables from Pydantic settings
             LLMService._setup_litellm_env()
             # Prepare LiteLLM kwargs with explicit type annotation
-            kwargs: Dict[str, Any] = {
+            kwargs: dict[str, Any] = {
                 "model": request.model,
                 "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
             }
