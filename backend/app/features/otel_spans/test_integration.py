@@ -5,14 +5,15 @@ Uses FastAPI TestClient for real HTTP requests against the API endpoints.
 """
 
 
-import pytest
 from fastapi.testclient import TestClient
 from opentelemetry.proto.common.v1 import common_pb2
 from opentelemetry.proto.trace.v1 import trace_pb2
+import pytest
 
 from app.db_duckdb.db_config import get_connection, initialize_tables
 from app.features.span_ingestion.span_processor import process_span_batch
 from app.main import app
+
 
 # ===== FIXTURES =====
 

@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config.settings import settings
 
+
 # Create the async engine
 engine = create_async_engine(
     settings.database.sqlite_url,

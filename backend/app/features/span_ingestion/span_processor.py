@@ -10,16 +10,17 @@ service and indexes them in DuckDB. It handles:
 Port of: backend/telemetry/otel_span_processor.go
 """
 
-import json
-import uuid
 from datetime import UTC, datetime
+import json
 from typing import Any
+import uuid
 
 from loguru import logger
 from opentelemetry.proto.common.v1 import common_pb2
 from opentelemetry.proto.trace.v1 import trace_pb2
 
 from app.db_duckdb.db_config import get_connection
+
 
 # Junjo attributes stored in dedicated columns (filtered from attributes_json)
 JUNJO_FILTERED_ATTRIBUTES = [

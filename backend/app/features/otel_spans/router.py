@@ -19,6 +19,7 @@ from loguru import logger
 
 from app.features.otel_spans import repository
 
+
 router = APIRouter()
 
 

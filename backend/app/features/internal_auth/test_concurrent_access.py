@@ -10,9 +10,9 @@ These tests verify that:
 import asyncio
 
 import grpc
-import pytest
 from httpx import AsyncClient
 from loguru import logger
+import pytest
 
 from app.config.settings import settings
 from app.main import app

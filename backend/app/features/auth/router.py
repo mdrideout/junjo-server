@@ -4,8 +4,8 @@ Authentication router.
 Implements all authentication endpoints, mirroring the Go implementation.
 """
 
-import secrets
 from datetime import datetime
+import secrets
 
 from fastapi import APIRouter, HTTPException, Request, status
 from loguru import logger
@@ -21,6 +21,7 @@ from app.db_sqlite.users.schemas import (
 )
 from app.features.auth.dependencies import CurrentUser
 from app.features.auth.service import AuthService
+
 
 router = APIRouter()
 

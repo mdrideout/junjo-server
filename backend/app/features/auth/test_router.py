@@ -7,8 +7,8 @@ Each test gets its own temporary SQLite database that is cleaned up after the te
 See: backend_python/app/database/README.md for details on the test database pattern.
 """
 
-import pytest
 from httpx import ASGITransport, AsyncClient
+import pytest
 
 from app.db_sqlite.users.repository import UserRepository
 from app.main import app

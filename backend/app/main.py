@@ -12,8 +12,8 @@ Pattern from wt_api_v2 (validated for production use).
 """
 
 import asyncio
-import os
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +29,7 @@ from app.features.auth.router import router as auth_router
 from app.features.llm_playground.router import router as llm_playground_router
 from app.features.otel_spans.router import router as otel_spans_router
 from app.grpc_server import start_grpc_server_background, stop_grpc_server
+
 
 # Set up logging before anything else
 setup_logging()

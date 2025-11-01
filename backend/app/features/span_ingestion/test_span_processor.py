@@ -8,9 +8,9 @@ Tests the complete span processing pipeline:
 
 from datetime import UTC
 
-import pytest
 from opentelemetry.proto.common.v1 import common_pb2
 from opentelemetry.proto.trace.v1 import trace_pb2
+import pytest
 
 from app.db_duckdb.db_config import get_connection
 from app.features.span_ingestion.span_processor import (

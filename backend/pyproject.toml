@@ -58,6 +58,10 @@ target-version = "py314"
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501"]                        # Line too long
 
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+force-sort-within-sections = true
+
 [tool.mypy]
 python_version = "3.14"
 strict = true
