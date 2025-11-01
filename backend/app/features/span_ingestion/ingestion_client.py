@@ -90,9 +90,7 @@ class IngestionClient:
             await self.channel.close()
             logger.info("Closed ingestion service connection")
 
-    async def read_spans(
-        self, start_key: bytes, batch_size: int = 100
-    ) -> list[SpanWithResource]:
+    async def read_spans(self, start_key: bytes, batch_size: int = 100) -> list[SpanWithResource]:
         """Read spans from ingestion service starting after start_key.
 
         This calls the ReadSpans RPC which returns a server-streaming response.
@@ -114,9 +112,7 @@ class IngestionClient:
         if not self.stub:
             raise Exception("Client not connected. Call connect() first.")
 
-        request = ingestion_pb2.ReadSpansRequest(
-            start_key_ulid=start_key, batch_size=batch_size
-        )
+        request = ingestion_pb2.ReadSpansRequest(start_key_ulid=start_key, batch_size=batch_size)
 
         spans = []
         try:

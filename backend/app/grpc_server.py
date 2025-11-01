@@ -5,7 +5,6 @@ This module creates and manages a gRPC server that runs concurrently with FastAP
 providing the InternalAuthService for the ingestion-service to validate API keys.
 """
 
-
 import grpc
 from loguru import logger
 
@@ -27,9 +26,7 @@ def create_grpc_server() -> grpc.aio.Server:
     server = grpc.aio.server()
 
     # Register the InternalAuthService
-    auth_pb2_grpc.add_InternalAuthServiceServicer_to_server(
-        InternalAuthServicer(), server
-    )
+    auth_pb2_grpc.add_InternalAuthServiceServicer_to_server(InternalAuthServicer(), server)
 
     # Bind to port (IPv4 - works better on macOS for dev)
     grpc_port = settings.GRPC_PORT

@@ -41,9 +41,7 @@ async def test_validate_api_key_integration_with_production_key():
 
         # Verify the response - should be valid since it exists in production DB
         assert response.is_valid is True
-        logger.info(
-            "✓ Integration test passed: Production API key validated successfully"
-        )
+        logger.info("✓ Integration test passed: Production API key validated successfully")
 
 
 @pytest.mark.integration

@@ -52,7 +52,6 @@ COPY proto/ ../proto/
 RUN chmod +x /tmp/generate_proto.sh && \
     /tmp/generate_proto.sh /app/app/proto_gen /app/../proto && \
     rm /tmp/generate_proto.sh
-COPY backend/.env.example ./.env.example
 
 # Copy Alembic configuration and migrations
 COPY backend/alembic.ini ./alembic.ini

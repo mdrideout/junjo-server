@@ -41,9 +41,7 @@ async def test_concurrent_grpc_requests():
 
     async def validate_key(key: str) -> bool:
         """Helper to validate a single key via gRPC."""
-        async with grpc.aio.insecure_channel(
-            f"localhost:{settings.GRPC_PORT}"
-        ) as channel:
+        async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
             stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
             request = auth_pb2.ValidateApiKeyRequest(api_key=key)
             response = await stub.ValidateApiKey(request)
@@ -59,7 +57,9 @@ async def test_concurrent_grpc_requests():
     assert len(results) == num_requests
 
     # Count expected valid vs invalid
-    valid_count = sum(1 for i in range(num_requests) if test_keys[i % len(test_keys)] == test_keys[0])
+    valid_count = sum(
+        1 for i in range(num_requests) if test_keys[i % len(test_keys)] == test_keys[0]
+    )
     invalid_count = num_requests - valid_count
 
     actual_valid = sum(1 for r in results if r)
@@ -92,9 +92,7 @@ async def test_mixed_fastapi_and_grpc_requests():
 
     async def grpc_validate_key(key: str) -> bool:
         """Helper to validate a key via gRPC."""
-        async with grpc.aio.insecure_channel(
-            f"localhost:{settings.GRPC_PORT}"
-        ) as channel:
+        async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
             stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
             request = auth_pb2.ValidateApiKeyRequest(api_key=key)
             response = await stub.ValidateApiKey(request)
@@ -104,16 +102,13 @@ async def test_mixed_fastapi_and_grpc_requests():
         """Helper to check FastAPI health endpoint."""
         # Use ASGI transport to test the app directly
         from httpx import ASGITransport
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/health")
             return response.status_code == 200
 
     # Create mixed concurrent tasks
-    grpc_tasks = [
-        grpc_validate_key("test_key_" + str(i)) for i in range(num_grpc_requests)
-    ]
+    grpc_tasks = [grpc_validate_key("test_key_" + str(i)) for i in range(num_grpc_requests)]
     fastapi_tasks = [fastapi_health_check() for _ in range(num_fastapi_requests)]
 
     # Interleave tasks to simulate real-world mixed traffic
@@ -153,9 +148,7 @@ async def test_grpc_under_load():
     async def validate_key() -> tuple[bool, float]:
         """Helper to validate key and measure response time."""
         start_time = asyncio.get_event_loop().time()
-        async with grpc.aio.insecure_channel(
-            f"localhost:{settings.GRPC_PORT}"
-        ) as channel:
+        async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
             stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
             request = auth_pb2.ValidateApiKeyRequest(api_key=production_test_key)
             response = await stub.ValidateApiKey(request)
@@ -175,11 +168,9 @@ async def test_grpc_under_load():
     max_response_time = max(response_times)
     min_response_time = min(response_times)
 
+    logger.info(f"✓ Load test passed: {num_requests} concurrent requests completed")
     logger.info(
-        f"✓ Load test passed: {num_requests} concurrent requests completed"
-    )
-    logger.info(
-        f"  Response times: avg={avg_response_time*1000:.2f}ms, min={min_response_time*1000:.2f}ms, max={max_response_time*1000:.2f}ms"
+        f"  Response times: avg={avg_response_time * 1000:.2f}ms, min={min_response_time * 1000:.2f}ms, max={max_response_time * 1000:.2f}ms"
     )
 
     # Sanity check: response times should be reasonable (< 1 second)
@@ -203,9 +194,7 @@ async def test_database_isolation_concurrent_reads():
 
     async def read_key_via_grpc() -> bool:
         """Make a gRPC call which triggers a database read."""
-        async with grpc.aio.insecure_channel(
-            f"localhost:{settings.GRPC_PORT}"
-        ) as channel:
+        async with grpc.aio.insecure_channel(f"localhost:{settings.GRPC_PORT}") as channel:
             stub = auth_pb2_grpc.InternalAuthServiceStub(channel)
             request = auth_pb2.ValidateApiKeyRequest(api_key=production_test_key)
             response = await stub.ValidateApiKey(request)
