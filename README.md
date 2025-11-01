@@ -69,7 +69,7 @@ Get Junjo Server running on your local machine in 5 minutes using the **[Junjo S
    - Replace `your_base64_key_here` in `JUNJO_SECURE_COOKIE_KEY` with the second generated value
 
    _See the [Bare Bones template repository](https://github.com/mdrideout/junjo-server-bare-bones/blob/master/README.md) for in-depth configuration instructions._
-
+ 
 4. **Create the Docker network** (first time only)
    ```bash
    docker network create junjo-network
