@@ -6,8 +6,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     volumes:
-      - ./.dbdata/sqlite:/dbdata/sqlite
-      - ./.dbdata/duckdb:/dbdata/duckdb
+      - ./.dbdata:/app/.dbdata
     ports:
       - "1323:1323"
     networks:
@@ -15,11 +14,12 @@ services:
     env_file:
       - .env
     environment:
-      - DB_SQLITE_PATH=/dbdata/sqlite/junjo.db
-      - DB_DUCKDB_PATH=/dbdata/duckdb/traces.duckdb
+      # Override host/port for Docker network communication
       - INGESTION_HOST=junjo-server-ingestion
       - INGESTION_PORT=50052
+      # Enable migrations on startup
       - RUN_MIGRATIONS=true
+      # DB paths inherited from .env (DB_SQLITE_PATH, DB_DUCKDB_PATH)
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:1323/ping')"]
       interval: 5s
@@ -36,7 +36,7 @@ services:
       target: ${JUNJO_BUILD_TARGET:-production}
     volumes:
       - ./ingestion-service:/app
-      - ./.dbdata/badgerdb:/dbdata/badgerdb
+      - ./.dbdata:/app/.dbdata
     ports:
       - "50051:50051"
       - "50052:50052"
